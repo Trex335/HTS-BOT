@@ -1,0 +1,22 @@
+[LOADER] Found the bot's appstate.
+(node:888) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+info login Bypass Currently Enabled.
+info login Logged in as 61576899457581
+info login Server region ATN
+info login Automatic refresh is Enabled
+info login Done logging in.
+[APPSTATE] Appstate updated and saved.
+[SETUP] Ensured module directories exist.
+[SETUP] Default command and event files ensured.
+
+──LOADING COMMANDS─●
+[COMMAND] LOADED help success
+[COMMAND] LOADED ping success
+
+──LOADING EVENTS─●
+[EVENT] LOADED welcome success
+[CUSTOM] Running custom script...
+[BOT] Bot initialization complete!
+[COMMAND] Executing command: help
+[Auto Restart] Start rebooting the system!

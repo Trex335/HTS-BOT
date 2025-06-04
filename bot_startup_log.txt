@@ -1,0 +1,42 @@
+[LOADER] Found the bot's appstate.
+(node:2161) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+info login Bypass Currently Enabled.
+info login Logged in as 61576899457581
+info login Server region ATN
+info login Automatic refresh is Enabled
+info login Done logging in.
+[APPSTATE] Appstate updated and saved.
+[SETUP] Ensured module directories exist.
+[SETUP] Default command and event files ensured.
+
+──LOADING COMMANDS─●
+[COMMAND] LOADED help success
+[COMMAND] LOADED ping success
+[COMMAND] LOADED prefix success
+[COMMAND] LOADED stop success
+
+──LOADING EVENTS─●
+[EVENT] LOADED welcome success
+[CUSTOM] Running custom script...
+[BOT] Bot initialization complete!
+[ACTIVATION] Sent activation message to Admin ID: 61555393416824
+[COMMAND] Executing command: help
+[COMMAND] Executing command: stop
+Error sending shutdown message: TypeError: callback is not a function
+    at Object.sendMessage (/home/runner/workspace/node_modules/josh-fca/src/sendMessage.js:375:14)
+    at module.exports.run (/home/runner/workspace/modules/commands/stop.js:23:9)
+    at /home/runner/workspace/index.js:185:27
+    at /home/runner/workspace/node_modules/josh-fca/src/listenMqtt.js:236:105
+    at resolveAttachmentUrl (/home/runner/workspace/node_modules/josh-fca/src/listenMqtt.js:236:137)
+    at parseDelta (/home/runner/workspace/node_modules/josh-fca/src/listenMqtt.js:245:5)
+    at MqttClient.<anonymous> (/home/runner/workspace/node_modules/josh-fca/src/listenMqtt.js:179:5)
+    at MqttClient.emit (node:events:518:28)
+    at Arguments.<anonymous> (/home/runner/workspace/node_modules/mqtt/lib/client.js:1150:27)
+    at MqttClient.options.customHandleAcks (/home/runner/workspace/node_modules/mqtt/lib/client.js:152:150)
+    at MqttClient._handlePublish (/home/runner/workspace/node_modules/mqtt/lib/client.js:1143:15)
+    at MqttClient._handlePacket (/home/runner/workspace/node_modules/mqtt/lib/client.js:351:12)
+    at work (/home/runner/workspace/node_modules/mqtt/lib/client.js:283:12)
+    at writable._write (/home/runner/workspace/node_modules/mqtt/lib/client.js:294:5)
+    at doWrite (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:428:64)
+    at writeOrBuffer (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:417:5)

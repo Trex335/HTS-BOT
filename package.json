@@ -1,15 +1,19 @@
 {
-  "name": "nodejs",
+  "name": "my-fca-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "A simple FCA bot",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@types/node": "^22.13.11"
+    "chalk": "^4.1.2",
+    "express": "^4.x.x",
+    "fs-extra": "^11.x.x",
+    "get-latest-version": "^2.x.x",
+    "josh-fca": "^1.x.x",
+    "moment-timezone": "^0.5.x",
+    "node-cron": "^3.x.x",
+    "semver": "^7.x.x"
   }
 }

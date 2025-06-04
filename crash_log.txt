@@ -1,0 +1,73 @@
+[LOADER] Found the bot's appstate.
+(node:1415) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+info login Bypass Currently Enabled.
+info login Logged in as 61576899457581
+info login Server region ATN
+info login Automatic refresh is Enabled
+info login Done logging in.
+[APPSTATE] Appstate updated and saved.
+[SETUP] Ensured module directories exist.
+[SETUP] Default command and event files ensured.
+
+──LOADING COMMANDS─●
+[COMMAND] LOADED help success
+[COMMAND] LOADED ping success
+
+──LOADING EVENTS─●
+[EVENT] LOADED welcome success
+[CUSTOM] Running custom script...
+[BOT] Bot initialization complete!
+[ACTIVATION] Sent activation message to Admin ID: 61555393416824
+[COMMAND] Executing command: ping
+[COMMAND] Executing command: help
+[COMMAND] Executing command: help
+ERR! listenMqtt Error: Connection refused: Server unavailable
+ERR! listenMqtt     at MqttClient._handleConnack (/home/runner/workspace/node_modules/mqtt/lib/client.js:1076:15)
+ERR! listenMqtt     at MqttClient._handlePacket (/home/runner/workspace/node_modules/mqtt/lib/client.js:365:12)
+ERR! listenMqtt     at work (/home/runner/workspace/node_modules/mqtt/lib/client.js:283:12)
+ERR! listenMqtt     at writable._write (/home/runner/workspace/node_modules/mqtt/lib/client.js:294:5)
+ERR! listenMqtt     at doWrite (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:428:64)
+ERR! listenMqtt     at writeOrBuffer (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:417:5)
+ERR! listenMqtt     at Writable.write (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:334:11)
+ERR! listenMqtt     at Duplexify.ondata (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:619:20)
+ERR! listenMqtt     at Duplexify.emit (node:events:518:28)
+ERR! listenMqtt     at addChunk (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:291:12)
+ERR! listenMqtt     at readableAddChunk (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:278:11)
+ERR! listenMqtt     at Readable.push (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:245:10)
+ERR! listenMqtt     at Duplexify._forward (/home/runner/workspace/node_modules/duplexify/index.js:170:26)
+ERR! listenMqtt     at Transform.onreadable (/home/runner/workspace/node_modules/duplexify/index.js:134:10)
+ERR! listenMqtt     at Transform.emit (node:events:518:28)
+ERR! listenMqtt     at emitReadable_ (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:504:10)
+ERR! listenMqtt  Error: Connection refused: Server unavailable
+ERR! listenMqtt     at MqttClient._handleConnack (/home/runner/workspace/node_modules/mqtt/lib/client.js:1076:15)
+ERR! listenMqtt     at MqttClient._handlePacket (/home/runner/workspace/node_modules/mqtt/lib/client.js:365:12)
+ERR! listenMqtt     at work (/home/runner/workspace/node_modules/mqtt/lib/client.js:283:12)
+ERR! listenMqtt     at writable._write (/home/runner/workspace/node_modules/mqtt/lib/client.js:294:5)
+ERR! listenMqtt     at doWrite (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:428:64)
+ERR! listenMqtt     at writeOrBuffer (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:417:5)
+ERR! listenMqtt     at Writable.write (/home/runner/workspace/node_modules/readable-stream/lib/_stream_writable.js:334:11)
+ERR! listenMqtt     at Duplexify.ondata (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:619:20)
+ERR! listenMqtt     at Duplexify.emit (node:events:518:28)
+ERR! listenMqtt     at addChunk (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:291:12)
+ERR! listenMqtt     at readableAddChunk (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:278:11)
+ERR! listenMqtt     at Readable.push (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:245:10)
+ERR! listenMqtt     at Duplexify._forward (/home/runner/workspace/node_modules/duplexify/index.js:170:26)
+ERR! listenMqtt     at Transform.onreadable (/home/runner/workspace/node_modules/duplexify/index.js:134:10)
+ERR! listenMqtt     at Transform.emit (node:events:518:28)
+ERR! listenMqtt     at emitReadable_ (/home/runner/workspace/node_modules/readable-stream/lib/_stream_readable.js:504:10) {
+ERR! listenMqtt   code: 3
+ERR! listenMqtt }
+ERR! getSeqId {
+ERR! getSeqId   error: 'Not logged in',
+ERR! getSeqId   res: {
+ERR! getSeqId     __ar: 1,
+ERR! getSeqId     rid: 'Av5Jdk2_GKsoEGi5AWIHoZA',
+ERR! getSeqId     payload: {},
+ERR! getSeqId     jsmods: { define: [Array], require: [Array] },
+ERR! getSeqId     hsrp: { hsdp: [Object], hblp: [Object] },
+ERR! getSeqId     allResources: [ 'Vr89bRr' ],
+ERR! getSeqId     lid: '7511893072123506713'
+ERR! getSeqId   }
+ERR! getSeqId }
+[LISTENER_ERROR] Listen error: undefined
