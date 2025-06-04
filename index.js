@@ -5,7 +5,7 @@ const fs = require("fs-extra");
 const semver = require("semver");
 const { readdirSync, readFileSync, writeFileSync } = require("fs-extra");
 const { join, resolve } = require("path");
-const express = require("express");
+const express = require("express"); // Import express
 const path = require("path");
 const moment = require("moment-timezone");
 const cron = require("node-cron");
@@ -20,7 +20,7 @@ const configJson = {
   "version": "1.0.1",
   "language": "en",
   "email": "trex28806@gmail.com", // This will be used only if appstate.json is missing or invalid
-  "password": "sssaaa",             // This will be used only if appstate.json is missing or invalid
+  "password": "sssaaa",           // This will be used only if appstate.json is missing or invalid
   "useEnvForCredentials": false,
   "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
   "DeveloperMode": true,
@@ -366,7 +366,11 @@ if (configJson.removeSt) {
   setTimeout(() => {
     process.exit(0);
   }, 10000);
-  return;
+  // Do NOT return here if you want the server to start, as it would exit the process.
+  // Instead, the bot process will exit, but the web server might still try to start briefly.
+  // Given Uptime Robot needs a persistent server, removing appstate and exiting might be counterproductive.
+  // For most uptime bot scenarios, you'd want to remove appstate and then *restart* the bot,
+  // which Render handles automatically if the process exits.
 }
 
 // Load package.json for dependency checking
@@ -649,7 +653,7 @@ async function onBot() {
             commandCategory: "utility",
             usePrefix: true,
             version: "1.0.0",
-            credits: "Your Name",
+            credits: "Hassan",
             description: "Responds with pong!",
             hasPermssion: 0,
             cooldowns: 5
@@ -669,7 +673,7 @@ async function onBot() {
             commandCategory: "utility",
             usePrefix: true,
             version: "1.0.0",
-            credits: "Your Name",
+            credits: "Hassan",
             description: "Shows all available commands.",
             hasPermssion: 0,
             cooldowns: 5
@@ -697,7 +701,7 @@ async function onBot() {
             name: "welcome",
             eventType: ["log:subscribe"],
             version: "1.0.0",
-            credits: "Your Name",
+            credits: "Hassan",
             description: "Welcomes new members.",
           };
           module.exports.run = async ({ api, event, global }) => {
@@ -820,5 +824,30 @@ async function onBot() {
   });
 }
 
-// Start the bot
+// --- Express Server for Uptime Robot ---
+// Define PORT early
+const PORT = process.env.PORT || 3000;
+
+// Function to start the Express server
+function startWebServer() {
+  const app = express();
+
+  app.get('/', (req, res) => {
+    res.status(200).send('Bot is awake and running!');
+  });
+
+  app.listen(PORT, '0.0.0.0', () => { // Explicitly bind to '0.0.0.0' for Render
+    logger.log(`Uptime Robot endpoint listening on port ${PORT}`, "SERVER");
+  }).on('error', (err) => {
+    logger.err(`Failed to start Express server: ${err.message}`, "SERVER_ERROR");
+    // You might want to exit or retry here depending on your deployment strategy
+    process.exit(1); // Exit if the server can't start
+  });
+}
+
+// --- Main execution flow ---
+// 1. Start the web server first to ensure it's listening.
+startWebServer();
+
+// 2. Then, start the bot's Facebook login and listening process.
 onBot();
