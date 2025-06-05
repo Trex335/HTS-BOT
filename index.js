@@ -211,7 +211,7 @@ const listen = ({ api }) => {
 
         if (!command) {
           return api.sendMessage(
-            `⚠️ The command "<span class="math-inline">\{prefix\}</span>{commandName}" does not exist.\n` +
+            `⚠️ The command "${prefix}${commandName}" does not exist.\n` +
             `Type ${prefix}help to see all available commands.`,
             event.threadID,
             event.messageID
@@ -801,6 +801,83 @@ async function onBot() {
           };
         `);
     }
+
+    // Example: Creating a 'help.js' command
+    const helpCommandPath = `${commandsPath}/help.js`;
+    if (!fs.existsSync(helpCommandPath)) {
+        logger.log("Creating new 'help.js' command file...", "SETUP");
+        fs.writeFileSync(helpCommandPath, `
+          module.exports.config = {
+            name: "help",
+            commandCategory: "utility",
+            usePrefix: true,
+            version: "1.0.0",
+            credits: "Hassan",
+            description: "Lists all available commands.",
+            hasPermssion: 0,
+            cooldowns: 5,
+            aliases: ["h", "cmds", "commands"]
+          };
+
+          module.exports.run = async function({ api, event, args, global }) {
+            const prefix = global.config.PREFIX;
+            const commands = global.client.commands;
+
+            let commandList = "";
+            let commandCount = 0;
+
+            const enabledCommands = Array.from(commands.values()).filter(cmd =>
+              !global.config.commandDisabled.includes(\`\${cmd.config.name}.js\`)
+            );
+
+            if (enabledCommands.length === 0) {
+              return api.sendMessage("No commands are currently available.", event.threadID, event.messageID);
+            }
+
+            if (args[0]) {
+              const searchCommand = args[0].toLowerCase();
+              const command = enabledCommands.find(cmd =>
+                cmd.config.name.toLowerCase() === searchCommand ||
+                (cmd.config.aliases && cmd.config.aliases.map(a => a.toLowerCase()).includes(searchCommand))
+              );
+
+              if (command) {
+                const { name, commandCategory, description, cooldowns, usePrefix, aliases } = command.config;
+                let msg = \`✨ Command: \${name}\n\`;
+                msg += \`📚 Category: \${commandCategory}\n\`;
+                msg += \`📝 Description: \${description}\n\`;
+                msg += \`⏰ Cooldown: \${cooldowns || 0} seconds\n\`;
+                msg += \`❗ Usage: \${usePrefix ? prefix : ""}\${name} \${command.config.usage || ""}\n\`;
+                if (aliases && aliases.length > 0) {
+                  msg += \`🔠 Aliases: \${aliases.join(", ")}\n\`;
+                }
+                return api.sendMessage(msg, event.threadID, event.messageID);
+              } else {
+                return api.sendMessage(\`Command '\${searchCommand}' not found or is disabled.\`, event.threadID, event.messageID);
+              }
+            }
+
+            const categories = new Map();
+            enabledCommands.forEach(cmd => {
+              const category = cmd.config.commandCategory || "No Category";
+              if (!categories.has(category)) {
+                categories.set(category, []);
+              }
+              categories.get(category).push(cmd.config.name);
+              commandCount++;
+            });
+
+            let message = \`Here are my available commands (\${commandCount}):\n\n\`;
+            categories.forEach((cmds, category) => {
+              message += \`📚 \${category.charAt(0).toUpperCase() + category.slice(1)} Commands:\n\`;
+              message += \`‣ \${cmds.join(", ")}\n\n\`;
+            });
+
+            message += \`To get more info on a command, type: \${prefix}help [command name]\`;
+            api.sendMessage(message, event.threadID, event.messageID);
+          };
+        `);
+    }
     // --- END NEW COMMAND ADDITION ---
 
     logger.log("Default command and event files ensured.", "SETUP");
@@ -867,10 +944,6 @@ async function onBot() {
         logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail ` + error, "EVENT");
       }
     }
-
-    // This line was already setting options, but it's important to have the latest options.
-    // It's good that it's here, but ensure the FCAOption object is fully configured before this point.
-    // global.client.api.setOptions(global.config.FCAOption); // This line is already called by login, so no need to call again unless dynamically changing options.
 
     global.client.listenMqtt = global.client.api.listenMqtt(listen({ api: global.client.api }));
     customScript({ api: global.client.api });
