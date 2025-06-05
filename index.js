@@ -6,7 +6,7 @@ const semver = require("semver");
 const { readdirSync, readFileSync, writeFileSync } = require("fs-extra");
 const { join, resolve } = require("path");
 const express = require("express");
-const path = require("path");
+const path = require("path"); // Make sure path is required
 const moment = require("moment-timezone");
 const cron = require("node-cron");
 const axios = require('axios'); // For external API calls if needed
@@ -605,7 +605,67 @@ global.client = {
   },
   timeStart: Date.now(),
   lastActivityTime: Date.now(), // Initialize last activity time
-  nonPrefixCommands: new Set() // To store names of commands that don't need a prefix or use "both"
+  nonPrefixCommands: new Set(), // To store names of commands that don't need a prefix or use "both"
+
+  // NEW: Function to dynamically load or reload a single command module
+  loadCommand: async function(commandFileName) {
+    const commandsPath = path.join(global.client.mainPath, 'modules', 'commands');
+    const fullPath = path.resolve(commandsPath, commandFileName); // Ensure full absolute path
+
+    try {
+      // Clear cache for the module to ensure latest version is loaded
+      if (require.cache[require.resolve(fullPath)]) {
+        delete require.cache[require.resolve(fullPath)];
+        logger.log(`Cleared cache for: ${commandFileName}`, "CMD_CACHE");
+      }
+
+      const module = require(fullPath);
+      const { config } = module;
+
+      if (!config?.name || !config?.commandCategory || !config?.hasOwnProperty("usePrefix") || !module.run) {
+        throw new Error(`Invalid command format: Missing name, category, usePrefix, or run function.`);
+      }
+
+      // If a command with this name already exists, remove it before adding the new one
+      if (global.client.commands.has(config.name)) {
+        logger.warn(`[ COMMAND ] Overwriting existing command: "${config.name}" (from ${commandFileName})`, "COMMAND_LOAD");
+        // Also remove from nonPrefixCommands set if it was there
+        if (global.client.nonPrefixCommands.has(config.name.toLowerCase())) {
+            global.client.nonPrefixCommands.delete(config.name.toLowerCase());
+        }
+        global.client.commands.delete(config.name); // Delete the old command
+      }
+
+      // Add to nonPrefixCommands if applicable
+      if (config.usePrefix === false || config.usePrefix === "both") {
+          global.client.nonPrefixCommands.add(config.name.toLowerCase());
+      }
+
+      // Execute onLoad function if it exists
+      if (module.onLoad) {
+        try {
+          await module.onLoad({ api: global.client.api });
+        } catch (error) {
+          throw new Error(`Error in onLoad function of ${commandFileName}: ${error.message}`);
+        }
+      }
+      // Register event handler if it exists
+      if (module.handleEvent && !global.client.eventRegistered.includes(config.name)) {
+          global.client.eventRegistered.push(config.name);
+      } else if (!module.handleEvent && global.client.eventRegistered.includes(config.name)) {
+          // If handleEvent was removed in an update, remove it from registered list
+          global.client.eventRegistered = global.client.eventRegistered.filter(name => name !== config.name);
+      }
+
+
+      global.client.commands.set(config.name, module);
+      logger.log(`${chalk.hex("#00FF00")(`LOADED`)} ${chalk.cyan(config.name)} (${commandFileName}) success`, "COMMAND_LOAD");
+      return true; // Indicate successful load
+    } catch (error) {
+      logger.err(`${chalk.hex("#FF0000")(`FAILED`)} to load ${chalk.yellow(commandFileName)}: ${error.message}`, "COMMAND_LOAD");
+      return false; // Indicate failure to load
+    }
+  }
 };
 
 global.data = {
@@ -802,54 +862,15 @@ async function onBot() {
     fs.ensureDirSync(includesCoverPath);
     logger.log("Ensured module directories exist.", "SETUP");
 
-    // --- Removed: Automatic creation of hello.js and help.js ---
-    // You will need to manually add your command files to modules/commands/
-    // Example:
-    // const helloCommandPath = `${commandsPath}/hello.js`;
-    // if (!fs.existsSync(helloCommandPath)) { /* ... create hello.js ... */ }
-    // const helpCommandPath = `${commandsPath}/help.js`;
-    // if (!fs.existsSync(helpCommandPath)) { /* ... create help.js ... */ }
-    // --- END REMOVED COMMAND ADDITION ---
-
-    logger.log("Default command and event files ensured.", "SETUP");
-
-    const listCommand = readdirSync(commandsPath).filter(
-      (command) =>
-        command.endsWith(".js") &&
-        !global.config.commandDisabled.includes(command)
+    // --- Command Loading (now uses global.client.loadCommand) ---
+    const listCommandFiles = readdirSync(commandsPath).filter(
+      (commandFile) =>
+        commandFile.endsWith(".js") &&
+        !global.config.commandDisabled.includes(commandFile)
     );
     console.log(cv(`\n` + `──LOADING COMMANDS─●`));
-    for (const command of listCommand) {
-      try {
-        const module = require(`${commandsPath}/${command}`);
-        const { config } = module;
-
-        if (!config?.name || !config?.commandCategory || !config?.hasOwnProperty("usePrefix") || !module.run) {
-          throw new Error(`[ COMMAND ] ${command} is not in the correct format. Missing name, category, usePrefix, or run function.`);
-        }
-        if (global.client.commands.has(config.name)) {
-          logger.err(`[ COMMAND ] ${chalk.hex("#FFFF00")(command)} Module is already loaded!`, "COMMAND");
-          continue;
-        }
-
-        // NEW: If the command is designated as non-prefix OR 'both', add its lowercase name to the set
-        if (config.usePrefix === false || config.usePrefix === "both") {
-            global.client.nonPrefixCommands.add(config.name.toLowerCase());
-        }
-
-        if (module.onLoad) {
-          try {
-            await module.onLoad({ api }); // Ensure onLoad is awaited if it's async
-          } catch (error) {
-            throw new Error("Unable to load the onLoad function of the module.");
-          }
-        }
-        if (module.handleEvent) global.client.eventRegistered.push(config.name);
-        global.client.commands.set(config.name, module);
-        logger.log(`${cra(`LOADED`)} ${cb(config.name)} success`, "COMMAND");
-      } catch (error) {
-        logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(command)} fail ` + error, "COMMAND");
-      }
+    for (const commandFile of listCommandFiles) {
+      await global.client.loadCommand(commandFile); // Use the new dynamic loader
     }
 
     // --- Event Loading ---
