@@ -180,19 +180,28 @@ const listen = ({ api }) => {
       // Potentially attempt to re-login on specific errors
       if (error.error === 'Not logged in') {
         logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        // You might want to implement a more robust re-login mechanism here
         // For simplicity, we'll just exit and let the process manager restart it.
         process.exit(1);
       }
       return; // Don't process if there's a listen error
     }
 
-    // Logger for all incoming events (optional, can be noisy)
-    // logger.log(`Received event: ${JSON.stringify(event)}`, "LISTENER");
-
     // Command Handling
     if (event.type === "message" && event.body) {
       const prefix = global.config.PREFIX;
+
+      // --- NEW: Handle "prefix" or "Prefix" message ---
+      if (event.body.toLowerCase() === "prefix") {
+        await utils.humanDelay(); // Add human-like delay before sending
+        return api.sendMessage(
+          `🌐 System prefix: ${prefix}\n🛸 Your box chat prefix: ${prefix}`,
+          event.threadID,
+          event.messageID
+        );
+      }
+      // --- END NEW HANDLING ---
+
+
       if (event.body.startsWith(prefix)) {
         const args = event.body.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift()?.toLowerCase(); // Use optional chaining to safely get commandName
@@ -307,7 +316,8 @@ const customScript = ({ api }) => {
   autoRestart(autoStuffConfig.autoRestart);
   acceptPending(autoStuffConfig.acceptPending);
 
-  // AUTOGREET EVERY 10 MINUTES
+  // AUTOGREET EVERY 10 MINUTES - Specific "Hassan Bot Activated" message remains removed
+  // This section is intentionally left blank for sending a message to prevent any unwanted greetings.
   cron.schedule('*/10 * * * *', () => {
     const currentTime = Date.now();
     if (currentTime - lastMessageTime < minInterval) {
@@ -321,12 +331,13 @@ const customScript = ({ api }) => {
       async function message(thread) {
         try {
           await utils.humanDelay(); // Delay before sending message
-          api.sendMessage({
-            body: `🤖 Hassan Bot Activated!\n\n📩 For any concerns, kindly contact Hassan:\n🔗 https://www.facebook.com/profile.php?id=61555393416824\n\n✅ Thank you for using Hassan Bot!`
-          }, thread.threadID, (err) => {
-            if (err) return;
-            messagedThreads.add(thread.threadID);
-          });
+          // The specific activation message with Facebook link is intentionally NOT here.
+          // api.sendMessage({
+          //   body: `🤖 Hassan Bot Activated!\n\n📩 For any concerns, kindly contact Hassan:\n🔗 https://www.facebook.com/profile.php?id=61555393416824\n\n✅ Thank you for using Hassan Bot!`
+          // }, thread.threadID, (err) => {
+          //   if (err) return;
+          //   messagedThreads.add(thread.threadID);
+          // });
         } catch (error) {
           console.error("Error sending a message:", error);
         }
@@ -334,7 +345,8 @@ const customScript = ({ api }) => {
 
       while (j < 20 && i < data.length) {
         if (data[i].isGroup && data[i].name != data[i].threadID && !messagedThreads.has(data[i].threadID)) {
-          await message(data[i]);
+          // No message sent here as per request.
+          // await message(data[i]);
           j++;
           const CuD = data[i].threadID;
           setTimeout(() => {
@@ -391,12 +403,12 @@ const customScript = ({ api }) => {
     timezone: "Asia/Dhaka"
   });
 
-  // NEW: Random Human-like Activity
+  // NEW: Random Human-like Activity - No reactions or typing indicators
   if (global.config.randomActivity.status) {
     cron.schedule('*/1 * * * *', async () => { // Check every minute if an activity should occur
       const minInterval = global.config.randomActivity.intervalMin;
-      const maxInterval = global.config.randomActivity.intervalMax;
-      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+      const maxInterval = global.config.randomActivity.intervalMax; // Corrected variable name
+      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval; // Corrected variable name
 
       // Only perform activity if enough time has passed since the last one
       if (Date.now() - global.client.lastActivityTime > randomMinutes * 60 * 1000) {
@@ -406,26 +418,8 @@ const customScript = ({ api }) => {
           if (threadList.length > 0) {
             const randomThread = threadList[Math.floor(Math.random() * threadList.length)];
 
-            // Choose a random activity
+            // Choose a random activity (only "go offline/online" and "mark as read" remain)
             const activities = [
-              async () => {
-                // Send a "typing..." indicator
-                await api.sendTypingIndicator(randomThread.threadID);
-                logger.log(`Sent typing indicator in thread ${randomThread.threadID}`, "ACTIVITY");
-              },
-              async () => {
-                // React to a random message in the thread (if any recent messages)
-                const messages = await api.getThreadHistory(randomThread.threadID, 10);
-                if (messages && messages.length > 0) {
-                  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-                  const reactions = ['❤️', '😆', '👍', '😮', '😢', '😡'];
-                  const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
-                  await api.setMessageReaction(randomReaction, randomMessage.messageID, (err) => {
-                    if (err) logger.err(`Error reacting to message: ${err.message}`, "ACTIVITY");
-                    else logger.log(`Reacted with ${randomReaction} to message ${randomMessage.messageID} in thread ${randomThread.threadID}`, "ACTIVITY");
-                  }, true); // True to unsend previous reaction if any
-                }
-              },
               async () => {
                 // Briefly go offline and back online
                 await api.setOptions({ online: false });
@@ -448,9 +442,13 @@ const customScript = ({ api }) => {
               }
             ];
 
-            const randomActivity = activities[Math.floor(Math.random() * activities.length)];
-            await randomActivity();
-            global.client.lastActivityTime = Date.now(); // Update last activity time
+            if (activities.length > 0) {
+              const randomActivity = activities[Math.floor(Math.random() * activities.length)];
+              await randomActivity();
+              global.client.lastActivityTime = Date.now(); // Update last activity time
+            } else {
+              logger.log("No random activities available after filtering.", "ACTIVITY");
+            }
           }
         } catch (e) {
           logger.err(`Error performing random activity: ${e.message}`, "ACTIVITY_ERROR");
@@ -625,7 +623,7 @@ const { cra, cv, cb } = getThemeColors();
 // Mock language data for demonstration
 const mockLangFileContent = `
 commands.hello=Hello there!
-`; // Removed help and ping entries
+`;
 const langFile = mockLangFileContent.split(/\r?\n|\r/);
 const langData = langFile.filter(
   (item) => item.indexOf("#") != 0 && item != ""
@@ -780,105 +778,14 @@ async function onBot() {
     fs.ensureDirSync(includesCoverPath);
     logger.log("Ensured module directories exist.", "SETUP");
 
-    // --- ADD NEW COMMAND HERE ---
-    // Example: Creating a 'hello.js' command
-    const helloCommandPath = `${commandsPath}/hello.js`;
-    if (!fs.existsSync(helloCommandPath)) {
-        logger.log("Creating new 'hello.js' command file...", "SETUP");
-        fs.writeFileSync(helloCommandPath, `
-          module.exports.config = {
-            name: "hello",
-            commandCategory: "utility",
-            usePrefix: true,
-            version: "1.0.0",
-            credits: "Hassan", // Change this to your name
-            description: "Says hello!",
-            hasPermssion: 0,
-            cooldowns: 5
-          };
-          module.exports.run = async ({ api, event, args, global }) => {
-            api.sendMessage(global.getText("commands", "hello"), event.threadID, event.messageID);
-          };
-        `);
-    }
-
-    // Example: Creating a 'help.js' command
-    const helpCommandPath = `${commandsPath}/help.js`;
-    if (!fs.existsSync(helpCommandPath)) {
-        logger.log("Creating new 'help.js' command file...", "SETUP");
-        fs.writeFileSync(helpCommandPath, `
-          module.exports.config = {
-            name: "help",
-            commandCategory: "utility",
-            usePrefix: true,
-            version: "1.0.0",
-            credits: "Hassan",
-            description: "Lists all available commands.",
-            hasPermssion: 0,
-            cooldowns: 5,
-            aliases: ["h", "cmds", "commands"]
-          };
-
-          module.exports.run = async function({ api, event, args, global }) {
-            const prefix = global.config.PREFIX;
-            const commands = global.client.commands;
-
-            let commandList = "";
-            let commandCount = 0;
-
-            const enabledCommands = Array.from(commands.values()).filter(cmd =>
-              !global.config.commandDisabled.includes(\`\${cmd.config.name}.js\`)
-            );
-
-            if (enabledCommands.length === 0) {
-              return api.sendMessage("No commands are currently available.", event.threadID, event.messageID);
-            }
-
-            if (args[0]) {
-              const searchCommand = args[0].toLowerCase();
-              const command = enabledCommands.find(cmd =>
-                cmd.config.name.toLowerCase() === searchCommand ||
-                (cmd.config.aliases && cmd.config.aliases.map(a => a.toLowerCase()).includes(searchCommand))
-              );
-
-              if (command) {
-                const { name, commandCategory, description, cooldowns, usePrefix, aliases } = command.config;
-                let msg = \`✨ Command: \${name}\n\`;
-                msg += \`📚 Category: \${commandCategory}\n\`;
-                msg += \`📝 Description: \${description}\n\`;
-                msg += \`⏰ Cooldown: \${cooldowns || 0} seconds\n\`;
-                msg += \`❗ Usage: \${usePrefix ? prefix : ""}\${name} \${command.config.usage || ""}\n\`;
-                if (aliases && aliases.length > 0) {
-                  msg += \`🔠 Aliases: \${aliases.join(", ")}\n\`;
-                }
-                return api.sendMessage(msg, event.threadID, event.messageID);
-              } else {
-                return api.sendMessage(\`Command '\${searchCommand}' not found or is disabled.\`, event.threadID, event.messageID);
-              }
-            }
-
-            const categories = new Map();
-            enabledCommands.forEach(cmd => {
-              const category = cmd.config.commandCategory || "No Category";
-              if (!categories.has(category)) {
-                categories.set(category, []);
-              }
-              categories.get(category).push(cmd.config.name);
-              commandCount++;
-            });
-
-            let message = \`Here are my available commands (\${commandCount}):\n\n\`;
-            categories.forEach((cmds, category) => {
-              message += \`📚 \${category.charAt(0).toUpperCase() + category.slice(1)} Commands:\n\`;
-              message += \`‣ \${cmds.join(", ")}\n\n\`;
-            });
-
-            message += \`To get more info on a command, type: \${prefix}help [command name]\`;
-            api.sendMessage(message, event.threadID, event.messageID);
-          };
-        `);
-    }
-    // --- END NEW COMMAND ADDITION ---
+    // --- Removed: Automatic creation of hello.js and help.js ---
+    // You will need to manually add your command files to modules/commands/
+    // Example:
+    // const helloCommandPath = `${commandsPath}/hello.js`;
+    // if (!fs.existsSync(helloCommandPath)) { /* ... create hello.js ... */ }
+    // const helpCommandPath = `${commandsPath}/help.js`;
+    // if (!fs.existsSync(helpCommandPath)) { /* ... create help.js ... */ }
+    // --- END REMOVED COMMAND ADDITION ---
 
     logger.log("Default command and event files ensured.", "SETUP");
 
