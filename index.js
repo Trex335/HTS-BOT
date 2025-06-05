@@ -20,7 +20,7 @@ const login = require('josh-fca');
 const configJson = {
   "version": "1.0.1",
   "language": "en",
-  "email": "hassanadvice900@gmail.com", // This will be used only if appstate.json is missing or invalid
+  "email": "trex28806@gmail.com", // This will be used only if appstate.json is missing or invalid
   "password": "sssaaa",           // This will be used only if appstate.json is missing or invalid
   "useEnvForCredentials": false,
   "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
@@ -190,7 +190,7 @@ const listen = ({ api }) => {
     if (event.type === "message" && event.body) {
       const prefix = global.config.PREFIX;
 
-      // --- NEW: Handle "prefix" or "Prefix" message ---
+      // --- Handle "prefix" or "Prefix" message ---
       if (event.body.toLowerCase() === "prefix") {
         await utils.humanDelay(); // Add human-like delay before sending
         return api.sendMessage(
@@ -261,7 +261,7 @@ const listen = ({ api }) => {
         }
       }
     });
-  };
+  }$;
 };
 
 // --- CUSTOM SCRIPT (for auto-restart, auto-greeting etc.) ---
@@ -274,7 +274,7 @@ const customScript = ({ api }) => {
 
   const autoStuffConfig = {
     autoRestart: {
-      status: true, // <--- CHANGED TO TRUE FOR PERIODIC RESTART
+      status: false, // <--- CHANGED TO FALSE: This disables automatic restarts
       time: 40,
       note: 'To avoid problems, enable periodic bot restarts',
     },
@@ -291,6 +291,8 @@ const customScript = ({ api }) => {
         logger.log('Start rebooting the system!', 'Auto Restart');
         process.exit(1); // Exit with code 1 to indicate a restart
       });
+    } else {
+      logger.warn('Automatic bot restarts are disabled by configuration.', 'Auto Restart');
     }
   }
 
@@ -315,51 +317,6 @@ const customScript = ({ api }) => {
 
   autoRestart(autoStuffConfig.autoRestart);
   acceptPending(autoStuffConfig.acceptPending);
-
-  // AUTOGREET EVERY 10 MINUTES - Specific "Hassan Bot Activated" message remains removed
-  // This section is intentionally left blank for sending a message to prevent any unwanted greetings.
-  cron.schedule('*/10 * * * *', () => {
-    const currentTime = Date.now();
-    if (currentTime - lastMessageTime < minInterval) {
-      return;
-    }
-    api.getThreadList(25, null, ['INBOX'], async (err, data) => {
-      if (err) return console.error("Error [Thread List Cron]: " + err);
-      let i = 0;
-      let j = 0;
-
-      async function message(thread) {
-        try {
-          await utils.humanDelay(); // Delay before sending message
-          // The specific activation message with Facebook link is intentionally NOT here.
-          // api.sendMessage({
-          //   body: `🤖 Hassan Bot Activated!\n\n📩 For any concerns, kindly contact Hassan:\n🔗 https://www.facebook.com/profile.php?id=61555393416824\n\n✅ Thank you for using Hassan Bot!`
-          // }, thread.threadID, (err) => {
-          //   if (err) return;
-          //   messagedThreads.add(thread.threadID);
-          // });
-        } catch (error) {
-          console.error("Error sending a message:", error);
-        }
-      }
-
-      while (j < 20 && i < data.length) {
-        if (data[i].isGroup && data[i].name != data[i].threadID && !messagedThreads.has(data[i].threadID)) {
-          // No message sent here as per request.
-          // await message(data[i]);
-          j++;
-          const CuD = data[i].threadID;
-          setTimeout(() => {
-            messagedThreads.delete(CuD);
-          }, 1000); // Clear from messagedThreads after 1 second cooldown for re-greeting
-        }
-        i++;
-      }
-    });
-  }, {
-    scheduled: true,
-    timezone: "Asia/Dhaka"
-  });
 
   // AUTOGREET EVERY 30 MINUTES
   cron.schedule('*/30 * * * *', () => {
@@ -407,8 +364,8 @@ const customScript = ({ api }) => {
   if (global.config.randomActivity.status) {
     cron.schedule('*/1 * * * *', async () => { // Check every minute if an activity should occur
       const minInterval = global.config.randomActivity.intervalMin;
-      const maxInterval = global.config.randomActivity.intervalMax; // Corrected variable name
-      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval; // Corrected variable name
+      const maxInterval = global.config.randomActivity.intervalMax;
+      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
 
       // Only perform activity if enough time has passed since the last one
       if (Date.now() - global.client.lastActivityTime > randomMinutes * 60 * 1000) {
