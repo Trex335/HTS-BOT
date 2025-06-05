@@ -8,7 +8,7 @@ module.exports = {
     version: "1.0.0",
     hasPermssion: 1, // ONLY ADMINBOT can use this command for security reasons
     credits: "Hassan", // Or "Hassan Bot Development Team"
-    description: "Installs a new command module from a URL. USE WITH EXTREME CAUTION!",
+    description: "Installs and loads a new command module from a URL. USE WITH EXTREME CAUTION!",
     commandCategory: "Admin", // Put in Admin category
     usages: "install <fileName.js> <direct_url_to_raw_js>",
     cooldowns: 10, // Longer cooldown due to sensitive nature
@@ -38,7 +38,7 @@ module.exports = {
 
     api.sendMessage(
       `Attempting to install "${fileName}" from "${fileUrl}"...\n\n` +
-      `⚠️ REMINDER: You are responsible for verifying the safety of this code. If this is a new command, a bot restart will be required for it to load.`,
+      `⚠️ REMINDER: You are responsible for verifying the safety of this code.`,
       event.threadID,
       event.messageID
     );
@@ -52,14 +52,25 @@ module.exports = {
 
       await fs.writeFile(filePath, fileContent, 'utf8');
 
-      api.sendMessage(
-        `✅ Successfully installed "${fileName}"!\n` +
-        `A bot restart is required for this new command to be loaded and become active.` +
-        `\nTo restart the bot, you'll need to redeploy it on your hosting platform (e.g., Render).`,
-        event.threadID,
-        event.messageID
-      );
-      logger.log(`Installed new command: ${fileName} from ${fileUrl}`, "INSTALL_CMD");
+      logger.log(`Installed new command file: ${fileName} to ${filePath}`, "INSTALL_CMD");
+
+      // NEW: Dynamically load the command
+      // Pass just the fileName; global.client.loadCommand will resolve the full path internally
+      const success = await global.client.loadCommand(fileName);
+
+      if (success) {
+        api.sendMessage(
+          `✅ Successfully installed and loaded "${fileName}"! The command "${global.config.PREFIX}${fileName.replace('.js', '')}" (or "${fileName.replace('.js', '')}" if usePrefix: "both" or false) is now active.`,
+          event.threadID,
+          event.messageID
+        );
+      } else {
+        api.sendMessage(
+          `⚠️ Successfully saved "${fileName}", but failed to load it. Please check the bot's console for errors.`,
+          event.threadID,
+          event.messageID
+        );
+      }
 
     } catch (error) {
       logger.err(`Failed to install ${fileName}: ${error.message}`, "INSTALL_CMD_FAIL");
