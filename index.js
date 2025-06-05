@@ -20,7 +20,7 @@ const login = require('josh-fca');
 const configJson = {
   "version": "1.0.1",
   "language": "en",
-  "email": "h0398761@gmail.com", // This will be used only if appstate.json is missing or invalid
+  "email": "trex28806@gmail.com", // This will be used only if appstate.json is missing or invalid
   "password": "sssaaa",           // This will be used only if appstate.json is missing or invalid
   "useEnvForCredentials": false,
   "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
@@ -40,7 +40,7 @@ const configJson = {
     ],
     "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
   },
-  "commandDisabled": [], // No commands are disabled by default
+  "commandDisabled": ["ping.js"], // Disabled help and ping commands
   "eventDisabled": ["welcome.js"], // Disabled welcome event
   "BOTNAME": "Bot",
   "PREFIX": "?",
@@ -195,28 +195,47 @@ const listen = ({ api }) => {
       const prefix = global.config.PREFIX;
       if (event.body.startsWith(prefix)) {
         const args = event.body.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
-        const command = global.client.commands.get(commandName);
+        const commandName = args.shift()?.toLowerCase(); // Use optional chaining to safely get commandName
 
-        if (command) {
-          try {
-            // Check permissions (basic example)
-            if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
-              // Implement your permission logic here based on event.senderID and global.config.ADMINBOT
-              // For now, let's just allow admins if hasPermssion is 1
-              if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
-                api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
-                return;
-              }
+        if (!commandName) {
+          // When user types just the prefix
+          return api.sendMessage(
+            `⚠️ The command you are using does not exist.\n` +
+            `Type ${prefix}help to see all available commands.`,
+            event.threadID,
+            event.messageID
+          );
+        }
+
+        const command = global.client.commands.get(commandName); // Use global.client.commands
+
+        if (!command) {
+          return api.sendMessage(
+            `⚠️ The command "<span class="math-inline">\{prefix\}</span>{commandName}" does not exist.\n` +
+            `Type ${prefix}help to see all available commands.`,
+            event.threadID,
+            event.messageID
+          );
+        }
+
+        // Rest of your command execution logic...
+        try {
+          // Check permissions (basic example)
+          if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
+            // Implement your permission logic here based on event.senderID and global.config.ADMINBOT
+            // For now, let's just allow admins if hasPermssion is 1
+            if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
+              api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
+              return;
             }
-
-            logger.log(`Executing command: ${commandName}`, "COMMAND");
-            await utils.humanDelay(); // Add human-like delay before executing command
-            await command.run({ api, event, args, global }); // Pass args and global
-          } catch (e) {
-            logger.err(`Error executing command '${commandName}': ${e.message}`, "COMMAND_EXEC");
-            api.sendMessage(`An error occurred while running the '${commandName}' command.`, event.threadID, event.messageID);
           }
+
+          logger.log(`Executing command: ${commandName}`, "COMMAND");
+          await utils.humanDelay(); // Add human-like delay before executing command
+          await command.run({ api, event, args, global }); // Pass args and global
+        } catch (e) {
+          logger.err(`Error executing command '${commandName}': ${e.message}`, "COMMAND_EXEC");
+          api.sendMessage(`An error occurred while running the '${commandName}' command.`, event.threadID, event.messageID);
         }
       }
     }
