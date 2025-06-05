@@ -2,12 +2,10 @@ const axios = require("axios");
 const path = require("path");
 const fs = require("fs-extra");
 
-const Prefixes = ["ai", "Yau5", "Ai", "assistant", "bot"];
-
-// Enhanced chat history management
+// Chat history management
 global.chatHistory = {};
 
-// Configuration for different AI services
+// AI Services Configuration
 const AI_SERVICES = {
   MAIN: "https://over-ai-yau-5001-center-hassan.vercel.app/ai",
   BACKUP: "https://api.other-ai-service.com/v1/chat",
@@ -24,34 +22,32 @@ const WAIFU_TAGS = {
 module.exports = {
   config: {
     name: "ai",
-    version: "2.5.0",
+    version: "2.6.0",
     author: "Hassan",
-    role: 0, // Changed to 0 to allow all users
+    role: 0,
     category: "ai",
+    usePrefix: false, // Disables prefix requirement
     shortDescription: {
-      en: "Advanced AI assistant with multi-feature support",
+      en: "Advanced AI assistant with natural language support",
     },
     longDescription: {
-      en: `An intelligent AI assistant capable of text responses, image generation, and specialized waifu image fetching.`,
+      en: `An intelligent AI assistant that understands natural language requests for text, images, and waifu pictures without requiring prefixes.`,
     },
     guide: {
-      en: `{pn} [prompt]
+      en: `Simply message naturally or use these starter words: ai, Yau5, Ai, assistant, bot
 
-Features:
-1. Text Responses:
-   - {pn} Explain quantum computing
-   - {pn} Tell me a joke
+Examples:
+1. Regular chat:
+   - "Tell me about quantum computing"
+   - "What's the weather today?"
 
-2. Image Search:
-   - {pn} image sunset
-   - {pn} show me pictures of dogs -4 (gets 4 images)
+2. Image search:
+   - "Show me sunset pictures"
+   - "image dogs -4" (gets 4 images)
 
-3. Waifu Images:
-   - {pn} waifu maid
-   - {pn} waifu raiden-shogun -2 (gets 2 images)
-
-4. Contextual Replies:
-   - Reply to AI's message to continue conversation
+3. Waifu images:
+   - "waifu maid"
+   - "send me raiden-shogun pics -2" (gets 2 images)
 
 Available waifu tags:
 SFW: ${WAIFU_TAGS.sfw.join(", ")}
@@ -60,46 +56,40 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
   },
 
   onStart: async function ({ message }) {
-    await message.reply("âœ… AI Assistant is ready! Type 'ai help' for usage guide.");
+    await message.reply("🤖 AI Assistant ready! Message naturally or use 'help' for guidance.");
   },
 
   onChat: async function ({ api, event, args, message }) {
     try {
-      const prefix = Prefixes.find(p => 
-        event.body && event.body.toLowerCase().startsWith(p.toLowerCase())
-      );
-
-      if (!prefix) return;
-
-      let prompt = event.body.substring(prefix.length).trim();
+      // Skip if it's a command from another module
+      if (event.body.startsWith(global.config.PREFIX)) return;
+      
+      const prompt = event.body.trim();
       const senderID = event.senderID;
 
-      // Initialize chat history if needed
+      // Initialize chat history
       if (!global.chatHistory[senderID]) {
         global.chatHistory[senderID] = [];
       }
 
-      // Handle contextual replies
-      if (event.type === "message_reply" && global.chatHistory[senderID].length > 0) {
-        const lastExchange = global.chatHistory[senderID].slice(-1)[0];
-        prompt = `${lastExchange.prompt} [CONTEXT] ${prompt}`;
-      }
-
-      // Check for special commands
+      // Handle special commands
       if (prompt.toLowerCase() === "clear history") {
         global.chatHistory[senderID] = [];
-        return message.reply("Your chat history has been cleared.");
+        return message.reply("🗑️ Chat history cleared!");
       }
 
       if (prompt.toLowerCase() === "help") {
-        return message.reply(this.config.guide.en.replace(/\{pn\}/g, prefix));
+        return message.reply(this.config.guide.en);
       }
 
       // Show typing indicator
-      api.setMessageReaction("âŒ›", event.messageID, () => {}, true);
+      api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
       // Handle image requests
-      if (prompt.toLowerCase().includes("image") || prompt.toLowerCase().includes("picture")) {
+      if (prompt.toLowerCase().includes("image") || 
+          prompt.toLowerCase().includes("picture") ||
+          prompt.toLowerCase().includes("show me") ||
+          prompt.toLowerCase().includes("send me")) {
         return this.handleImageRequest({ api, event, prompt, message });
       }
 
@@ -124,26 +114,24 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
       }
 
       await message.reply(aiResponse);
-      api.setMessageReaction("âœ…", event.messageID, () => {}, true);
+      api.setMessageReaction("✅", event.messageID, () => {}, true);
 
     } catch (error) {
       console.error("AI Command Error:", error);
-      await message.reply(`âœ– Error: ${error.message || "Failed to process request"}`);
-      api.setMessageReaction("âœ–", event.messageID, () => {}, true);
+      await message.reply(`❌ Error: ${error.message || "Request failed"}`);
+      api.setMessageReaction("❌", event.messageID, () => {}, true);
     }
   },
 
   extractWaifuTag: function(prompt) {
     const lowerPrompt = prompt.toLowerCase();
-    const waifuPrefix = "waifu";
+    const waifuPrefixes = ["waifu", "send me", "show me", "pic of"];
     
-    if (!lowerPrompt.includes(waifuPrefix)) return null;
+    const hasWaifuPrefix = waifuPrefixes.some(prefix => lowerPrompt.includes(prefix));
+    if (!hasWaifuPrefix) return null;
     
-    const tagPart = prompt.substring(prompt.toLowerCase().indexOf(waifuPrefix) + waifuPrefix.length).trim();
-    const possibleTag = tagPart.split(/\s+/)[0].toLowerCase();
-    
-    if ([...WAIFU_TAGS.sfw, ...WAIFU_TAGS.nsfw].includes(possibleTag)) {
-      return possibleTag;
+    for (const tag of [...WAIFU_TAGS.sfw, ...WAIFU_TAGS.nsfw]) {
+      if (lowerPrompt.includes(tag)) return tag;
     }
     
     return null;
@@ -152,14 +140,20 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
   async handleWaifuRequest({ api, event, tag, message }) {
     try {
       const isNsfw = WAIFU_TAGS.nsfw.includes(tag);
-      const threadInfo = await api.getThreadInfo(event.threadID);
       
-      if (isNsfw && !threadInfo.isGroup) {
-        return message.reply("NSFW content is only allowed in groups.");
+      // Get number of images requested (-2, -4 etc.)
+      const numMatch = event.body.match(/-(\d+)$/);
+      const numImages = numMatch ? Math.min(parseInt(numMatch[1], 10), 8) : 4;
+
+      if (isNsfw) {
+        const threadInfo = await api.getThreadInfo(event.threadID);
+        if (!threadInfo.isGroup) {
+          return message.reply("🔞 NSFW content is only allowed in groups.");
+        }
       }
 
       const response = await axios.get(`${AI_SERVICES.WAIFU_API}?included_tags=${tag}&many=true`);
-      const images = response.data.images.slice(0, 4); // Limit to 4 images
+      const images = response.data.images.slice(0, numImages);
       
       const attachments = await Promise.all(
         images.map(async (img, i) => {
@@ -171,7 +165,7 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
       );
 
       await message.reply({
-        body: `ðŸ§± Here are your ${tag} waifu images:`,
+        body: `🌸 Here are your ${tag} waifu images:`,
         attachment: attachments
       });
 
@@ -183,19 +177,19 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
 
   async handleImageRequest({ api, event, prompt, message }) {
     try {
-      const cleanPrompt = prompt.replace(/image|picture|show me|photos?/gi, "").trim();
+      const cleanPrompt = prompt.replace(/(image|picture|show me|send me|photos?)/gi, "").trim();
       const numberMatch = cleanPrompt.match(/-(\d+)$/);
       const numImages = numberMatch ? Math.min(parseInt(numberMatch[1], 10), 8) : 4;
       const searchQuery = cleanPrompt.replace(/-\d+$/, "").trim();
 
       const response = await axios.get(`${AI_SERVICES.IMAGE_API}?query=${encodeURIComponent(searchQuery)}&per_page=${numImages}`, {
-        headers: { Authorization: "NoL8ytYlwsYIqmkLBboshW909HzoBoBnGZJbpmwAcahp5PF9TAnr9p7Z" } // Replace with actual key
+        headers: { Authorization: "NoL8ytYlwsYIqmkLBboshW909HzoBoBnGZJbpmwAcahp5PF9TAnr9p7Z" }
       });
 
       const images = response.data.photos.slice(0, numImages);
       
       if (images.length === 0) {
-        return message.reply("No images found for your query.");
+        return message.reply("🖼️ No images found for your query.");
       }
 
       const attachments = await Promise.all(
@@ -208,7 +202,7 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
       );
 
       await message.reply({
-        body: `ðŸ“· Here are ${images.length} images for "${searchQuery}":`,
+        body: `🖼️ Here are ${images.length} images for "${searchQuery}":`,
         attachment: attachments
       });
 
@@ -220,7 +214,6 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
 
   async getAIResponse(prompt) {
     try {
-      // Try primary API first
       const response = await axios.get(`${AI_SERVICES.MAIN}?prompt=${encodeURIComponent(prompt)}`);
       
       if (response.data && response.data.response) {
@@ -236,9 +229,12 @@ NSFW: ${WAIFU_TAGS.nsfw.join(", ")}`
       return backupResponse.data.choices[0].message.content;
     } catch (error) {
       console.error("AI Service Error:", error);
-      throw new Error("All AI services are currently unavailable. Please try again later.");
+      throw new Error("I'm having trouble thinking right now. Please try again later.");
     }
   },
+
+  // Fallback compatibility
+  run: async function () {},
 
   onReply: async function ({ api, message, event, args }) {
     return this.onChat({ api, message, event, args });
