@@ -28,7 +28,7 @@ const configJson = {
   "autoCreateDB": true,
   "allowInbox": false,
   "autoClean": true,
-  "adminOnly": false,
+  "adminOnly": false, // Set to true if you want the bot to only respond to ADMINBOT IDs (higher protection, limited functionality)
   "encryptSt": false,
   "removeSt": false,
   "UPDATE": {
@@ -63,16 +63,16 @@ const configJson = {
   "FCAOption": {
     "forceLogin": false,
     "listenEvents": true,
-    "autoMarkDelivery": true, // Mark messages as delivered
-    "autoMarkRead": true,     // Mark messages as read
+    "autoMarkDelivery": true, // Mark messages as delivered (appears more human)
+    "autoMarkRead": true,     // Mark messages as read (appears more human)
     "logLevel": "silent",     // Reduce log verbosity for production
     "selfListen": false,
-    "online": true,
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", // More recent user agent
-    "autoReconnect": true,    // Enable auto-reconnect
-    "autoRestore": true,      // Restore session after disconnect
-    "syncUp": true,           // Sync up with Facebook server
-    "delay": 500              // Add a slight delay to API calls
+    "online": true,           // If set to 'false', bot will appear offline. Setting to 'true' is common but might slightly increase detection risk if Facebook monitors continuous online status from unusual IPs. 'randomActivity' function below already toggles this.
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", // More recent user agent for better mimicry
+    "autoReconnect": true,    // Enable auto-reconnect for stability
+    "autoRestore": true,      // Restore session after disconnect for stability
+    "syncUp": true,           // Sync up with Facebook server for stability
+    "delay": 500              // Add a slight delay to API calls (good for human-like timing)
   },
   "daily": {
     "cooldownTime": 43200000,
@@ -109,14 +109,14 @@ const configJson = {
     "autoUnsend": true,
     "delayUnsend": 60
   },
-  "humanLikeDelay": { // New configuration for human-like delays
-    "min": 1000, // Minimum delay in milliseconds
-    "max": 5000  // Maximum delay in milliseconds
+  "humanLikeDelay": { // Configuration for human-like delays *before* command/event execution
+    "min": 1000, // Minimum delay in milliseconds (1 second)
+    "max": 5000  // Maximum delay in milliseconds (5 seconds) - Can increase for more caution
   },
-  "randomActivity": { // New configuration for random activities
+  "randomActivity": { // Configuration for random activities to appear less like a bot
     "status": true,
-    "intervalMin": 30, // Minimum interval in minutes
-    "intervalMax": 120 // Maximum interval in minutes
+    "intervalMin": 30, // Minimum interval in minutes for an activity to occur
+    "intervalMax": 120 // Maximum interval in minutes for an activity to occur
   }
 };
 
@@ -162,7 +162,7 @@ const utils = {
   complete: () => {
     logger.log("Bot initialization complete!", "BOT");
   },
-  // New utility for human-like delays
+  // Utility for human-like delays before commands/events
   humanDelay: async () => {
     const min = global.config.humanLikeDelay.min;
     const max = global.config.humanLikeDelay.max;
@@ -172,7 +172,7 @@ const utils = {
   }
 };
 
-// --- LISTEN HANDLER (Corrected: Removed the extra '$' character) ---
+// --- LISTEN HANDLER ---
 const listen = ({ api }) => {
   return async (error, event) => {
     if (error) {
@@ -182,6 +182,13 @@ const listen = ({ api }) => {
         process.exit(1);
       }
       return;
+    }
+
+    // If adminOnly is true, only process messages from ADMINBOT IDs
+    if (global.config.adminOnly && !global.config.ADMINBOT.includes(event.senderID)) {
+      // You can optionally send a message here indicating the bot is in admin-only mode
+      // api.sendMessage("I'm currently in admin-only mode and can only respond to my administrator.", event.threadID);
+      return; // Ignore messages from non-admin users
     }
 
     if (event.type === "message" && event.body) {
@@ -229,7 +236,7 @@ const listen = ({ api }) => {
           }
 
           logger.log(`Executing command: ${commandName}`, "COMMAND");
-          await utils.humanDelay();
+          await utils.humanDelay(); // Delay before command execution
           await command.run({ api, event, args, global });
         } catch (e) {
           logger.err(`Error executing command '${commandName}': ${e.message}`, "COMMAND_EXEC");
@@ -243,7 +250,7 @@ const listen = ({ api }) => {
       if (eventModule.config.eventType && eventModule.config.eventType.includes(event.type)) {
         try {
           logger.log(`Executing event: ${eventModule.config.name} for type ${event.type}`, "EVENT");
-          await utils.humanDelay();
+          await utils.humanDelay(); // Delay before event execution
           await eventModule.run({ api, event, global });
         } catch (e) {
           logger.err(`Error executing event '${eventModule.config.name}': ${e.message}`, "EVENT_EXEC");
@@ -263,7 +270,7 @@ const customScript = ({ api }) => {
 
   const autoStuffConfig = {
     autoRestart: {
-      status: false, // <--- CHANGED TO FALSE: This disables automatic restarts
+      status: false, // Keeping this false to avoid frequent server restarts that might appear suspicious
       time: 40,
       note: 'To avoid problems, enable periodic bot restarts',
     },
@@ -281,7 +288,7 @@ const customScript = ({ api }) => {
         process.exit(1); // Exit with code 1 to indicate a restart
       });
     } else {
-      logger.warn('Automatic bot restarts are disabled by configuration.', 'Auto Restart');
+      logger.warn('Automatic bot restarts are disabled by configuration to reduce potential detection.', 'Auto Restart');
     }
   }
 
@@ -308,6 +315,8 @@ const customScript = ({ api }) => {
   acceptPending(autoStuffConfig.acceptPending);
 
   // AUTOGREET EVERY 30 MINUTES
+  // This can also be a source of detection if too many greetings are sent too frequently.
+  // Consider disabling or making it less frequent if issues persist.
   cron.schedule('*/30 * * * *', () => {
     const currentTime = Date.now();
     if (currentTime - lastMessageTime < minInterval) {
@@ -349,7 +358,7 @@ const customScript = ({ api }) => {
     timezone: "Asia/Dhaka"
   });
 
-  // NEW: Random Human-like Activity - No reactions or typing indicators
+  // Random Human-like Activity: Toggles online status, marks as read.
   if (global.config.randomActivity.status) {
     cron.schedule('*/1 * * * *', async () => { // Check every minute if an activity should occur
       const minInterval = global.config.randomActivity.intervalMin;
@@ -364,7 +373,6 @@ const customScript = ({ api }) => {
           if (threadList.length > 0) {
             const randomThread = threadList[Math.floor(Math.random() * threadList.length)];
 
-            // Choose a random activity (only "go offline/online" and "mark as read" remain)
             const activities = [
               async () => {
                 // Briefly go offline and back online
@@ -671,15 +679,18 @@ async function onBot() {
   login(loginData, fcaLoginOptions, async (err, api) => { // Pass fcaLoginOptions here
     if (err) {
       console.error(err);
-      // More descriptive error for login failures
+      // More descriptive error for login failures, guiding the user to browser login
       if (err.error === 'login-approval' || err.error === 'Login approval needed') {
-          logger.err("Login approval needed. Please approve the login from your Facebook account.", "LOGIN_FAILED");
+          logger.err("Login approval needed. Please approve the login from your Facebook account in a web browser, then try again.", "LOGIN_FAILED");
       } else if (err.error === 'Incorrect username/password.') {
           logger.err("Incorrect email or password. Please check your config.json or environment variables.", "LOGIN_FAILED");
       } else if (err.error === 'The account is temporarily unavailable.') {
-          logger.err("The account is temporarily unavailable. This might be a temporary Facebook block. Try again later.", "LOGIN_FAILED");
-      } else {
-          logger.err(`Fatal login error: ${err.message || JSON.stringify(err)}`, "LOGIN_FAILED");
+          logger.err("The account is temporarily unavailable. This might be a temporary Facebook block. Try logging into Facebook in a browser to clear any flags, then try again.", "LOGIN_FAILED");
+      } else if (err.error.includes('error retrieving userID') || err.error.includes('from an unknown location')) {
+          logger.err(`Facebook login blocked from an unknown location. You must log into your Facebook account directly in a web browser and clear any security checks, then re-deploy the bot. Error: ${err.message || JSON.stringify(err)}`, "LOGIN_FAILED");
+      }
+      else {
+          logger.err(`Fatal login error: ${err.message || JSON.stringify(err)}. Try logging into Facebook in a browser to resolve security issues.`, "LOGIN_FAILED");
       }
       return process.exit(0);
     }
