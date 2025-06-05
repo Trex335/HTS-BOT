@@ -40,7 +40,7 @@ const configJson = {
     ],
     "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
   },
-  "commandDisabled": ["ping.js"], // Disabled help and ping commands. Ensure your non-prefix commands are NOT here!
+  "commandDisabled": ["ping.js"], // Disabled help and ping commands. Ensure your non-prefix/both commands are NOT here!
   "eventDisabled": ["welcome.js"], // Disabled welcome event
   "BOTNAME": "Bot",
   "PREFIX": "?",
@@ -207,16 +207,14 @@ const listen = ({ api }) => {
 
       let commandFoundAndExecuted = false;
 
-      // --- NEW: General check for non-prefix commands ---
-      for (const cmdName of global.client.nonPrefixCommands) {
+      // --- Check for non-prefix commands ---
+      for (const cmdNameLower of global.client.nonPrefixCommands) {
           // Check if message body is exactly the command name OR starts with the command name followed by a space
-          if (lowerCaseBody === cmdName || lowerCaseBody.startsWith(`${cmdName} `)) {
-              // Retrieve the command module using its original case-sensitive name from global.client.commands
-              // We need the original name to get it from the map, as map keys are case-sensitive.
-              // So we find the command that has this lowercased name.
+          if (lowerCaseBody === cmdNameLower || lowerCaseBody.startsWith(`${cmdNameLower} `)) {
+              // Find the actual command module (case-sensitive)
               let foundCommand = null;
               for (const [key, cmdModule] of global.client.commands.entries()) {
-                  if (key.toLowerCase() === cmdName && cmdModule.config.usePrefix === false) {
+                  if (key.toLowerCase() === cmdNameLower && (cmdModule.config.usePrefix === false || cmdModule.config.usePrefix === "both")) {
                       foundCommand = cmdModule;
                       break;
                   }
@@ -224,7 +222,7 @@ const listen = ({ api }) => {
 
               if (foundCommand) {
                   // Extract the prompt/arguments for the non-prefix command
-                  const promptText = lowerCaseBody.startsWith(`${cmdName} `) ? event.body.slice(cmdName.length + 1).trim() : "";
+                  const promptText = lowerCaseBody.startsWith(`${cmdNameLower} `) ? event.body.slice(cmdNameLower.length + 1).trim() : "";
                   const args = promptText.split(/ +/).filter(Boolean); // Filter(Boolean) removes empty strings
 
                   // Check permissions for the non-prefix command
@@ -237,14 +235,14 @@ const listen = ({ api }) => {
                   }
 
                   try {
-                      logger.log(`Executing non-prefix command: ${cmdName} with prompt: "${promptText}"`, "NON_PREFIX_COMMAND");
+                      logger.log(`Executing non-prefix command: ${foundCommand.config.name} with prompt: "${promptText}"`, "NON_PREFIX_COMMAND");
                       await utils.humanDelay();
                       // Pass the extracted prompt (full string after command name) and args (split by space)
                       await foundCommand.run({ api, event, args, global, prompt: promptText });
                       commandFoundAndExecuted = true;
                   } catch (e) {
-                      logger.err(`Error executing non-prefix command '${cmdName}': ${e.message}`, "NON_PREFIX_EXEC");
-                      api.sendMessage(`An error occurred while running the '${cmdName}' command.`, event.threadID, event.messageID);
+                      logger.err(`Error executing non-prefix command '${foundCommand.config.name}': ${e.message}`, "NON_PREFIX_EXEC");
+                      api.sendMessage(`An error occurred while running the '${foundCommand.config.name}' command.`, event.threadID, event.messageID);
                       commandFoundAndExecuted = true;
                   }
                   break; // Stop checking other non-prefix commands once one is found and handled
@@ -255,7 +253,7 @@ const listen = ({ api }) => {
       if (commandFoundAndExecuted) {
           return; // Don't process as a prefixed command if a non-prefix one was found and handled
       }
-      // --- END NEW: General check for non-prefix commands ---
+      // --- End check for non-prefix commands ---
 
       // Existing prefixed command logic
       if (event.body.startsWith(prefix)) {
@@ -282,6 +280,16 @@ const listen = ({ api }) => {
           );
         }
 
+        // NEW: Only run prefixed command if it's explicitly true or "both"
+        if (command.config.usePrefix === false) { // It's a non-prefix only command, so ignore if used with prefix
+            return api.sendMessage(
+              `⚠️ The command "${command.config.name}" does not require a prefix.\n` +
+              `Just type "${command.config.name} ${command.config.usages.split('OR')[0].trim()}" to use it.`,
+              event.threadID,
+              event.messageID
+            );
+        }
+
         try {
           if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
             if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
@@ -290,12 +298,15 @@ const listen = ({ api }) => {
             }
           }
 
-          logger.log(`Executing command: ${commandName}`, "COMMAND");
+          logger.log(`Executing command: ${command.config.name}`, "COMMAND");
           await utils.humanDelay(); // Delay before command execution
-          await command.run({ api, event, args, global });
+          // For prefixed commands, 'prompt' will be the entire argument string after the command name.
+          // 'args' will be the same string split by spaces.
+          const prefixedPrompt = args.join(" ");
+          await command.run({ api, event, args, global, prompt: prefixedPrompt });
         } catch (e) {
-          logger.err(`Error executing command '${commandName}': ${e.message}`, "COMMAND_EXEC");
-          api.sendMessage(`An error occurred while running the '${commandName}' command.`, event.threadID, event.messageID);
+          logger.err(`Error executing command '${command.config.name}': ${e.message}`, "COMMAND_EXEC");
+          api.sendMessage(`An error occurred while running the '${command.config.name}' command.`, event.threadID, event.messageID);
         }
       }
     }
@@ -594,7 +605,7 @@ global.client = {
   },
   timeStart: Date.now(),
   lastActivityTime: Date.now(), // Initialize last activity time
-  nonPrefixCommands: new Set() // NEW: To store names of commands that don't need a prefix
+  nonPrefixCommands: new Set() // To store names of commands that don't need a prefix or use "both"
 };
 
 global.data = {
@@ -821,8 +832,8 @@ async function onBot() {
           continue;
         }
 
-        // NEW: If the command is designated as non-prefix, add its lowercase name to the set
-        if (config.usePrefix === false) {
+        // NEW: If the command is designated as non-prefix OR 'both', add its lowercase name to the set
+        if (config.usePrefix === false || config.usePrefix === "both") {
             global.client.nonPrefixCommands.add(config.name.toLowerCase());
         }
 
