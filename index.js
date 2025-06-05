@@ -172,42 +172,35 @@ const utils = {
   }
 };
 
-// --- LISTEN HANDLER (Corrected) ---
+// --- LISTEN HANDLER (Corrected: Removed the extra '$' character) ---
 const listen = ({ api }) => {
-  return async (error, event) => { // Now asynchronous
+  return async (error, event) => {
     if (error) {
       logger.err(`Listen error: ${error.message}`, "LISTENER_ERROR");
-      // Potentially attempt to re-login on specific errors
       if (error.error === 'Not logged in') {
         logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        // For simplicity, we'll just exit and let the process manager restart it.
         process.exit(1);
       }
-      return; // Don't process if there's a listen error
+      return;
     }
 
-    // Command Handling
     if (event.type === "message" && event.body) {
       const prefix = global.config.PREFIX;
 
-      // --- Handle "prefix" or "Prefix" message ---
       if (event.body.toLowerCase() === "prefix") {
-        await utils.humanDelay(); // Add human-like delay before sending
+        await utils.humanDelay();
         return api.sendMessage(
           `🌐 System prefix: ${prefix}\n🛸 Your box chat prefix: ${prefix}`,
           event.threadID,
           event.messageID
         );
       }
-      // --- END NEW HANDLING ---
-
 
       if (event.body.startsWith(prefix)) {
         const args = event.body.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift()?.toLowerCase(); // Use optional chaining to safely get commandName
+        const commandName = args.shift()?.toLowerCase();
 
         if (!commandName) {
-          // When user types just the prefix
           return api.sendMessage(
             `⚠️ The command you are using does not exist.\n` +
             `Type ${prefix}help to see all available commands.`,
@@ -216,7 +209,7 @@ const listen = ({ api }) => {
           );
         }
 
-        const command = global.client.commands.get(commandName); // Use global.client.commands
+        const command = global.client.commands.get(commandName);
 
         if (!command) {
           return api.sendMessage(
@@ -227,12 +220,8 @@ const listen = ({ api }) => {
           );
         }
 
-        // Rest of your command execution logic...
         try {
-          // Check permissions (basic example)
           if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
-            // Implement your permission logic here based on event.senderID and global.config.ADMINBOT
-            // For now, let's just allow admins if hasPermssion is 1
             if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
               api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
               return;
@@ -240,8 +229,8 @@ const listen = ({ api }) => {
           }
 
           logger.log(`Executing command: ${commandName}`, "COMMAND");
-          await utils.humanDelay(); // Add human-like delay before executing command
-          await command.run({ api, event, args, global }); // Pass args and global
+          await utils.humanDelay();
+          await command.run({ api, event, args, global });
         } catch (e) {
           logger.err(`Error executing command '${commandName}': ${e.message}`, "COMMAND_EXEC");
           api.sendMessage(`An error occurred while running the '${commandName}' command.`, event.threadID, event.messageID);
@@ -254,14 +243,14 @@ const listen = ({ api }) => {
       if (eventModule.config.eventType && eventModule.config.eventType.includes(event.type)) {
         try {
           logger.log(`Executing event: ${eventModule.config.name} for type ${event.type}`, "EVENT");
-          await utils.humanDelay(); // Add human-like delay before executing event
-          await eventModule.run({ api, event, global }); // Pass global
+          await utils.humanDelay();
+          await eventModule.run({ api, event, global });
         } catch (e) {
           logger.err(`Error executing event '${eventModule.config.name}': ${e.message}`, "EVENT_EXEC");
         }
       }
     });
-  }$;
+  };
 };
 
 // --- CUSTOM SCRIPT (for auto-restart, auto-greeting etc.) ---
