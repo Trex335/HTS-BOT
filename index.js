@@ -40,7 +40,7 @@ const configJson = {
     ],
     "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
   },
-  "commandDisabled": ["ping.js"], // Disabled help and ping commands
+  "commandDisabled": ["ping.js"], // Disabled help and ping commands. Ensure "ai.js" is NOT here!
   "eventDisabled": ["welcome.js"], // Disabled welcome event
   "BOTNAME": "Bot",
   "PREFIX": "?",
@@ -192,9 +192,10 @@ const listen = ({ api }) => {
     }
 
     if (event.type === "message" && event.body) {
+      const lowerCaseBody = event.body.toLowerCase();
       const prefix = global.config.PREFIX;
 
-      if (event.body.toLowerCase() === "prefix") {
+      if (lowerCaseBody === "prefix") {
         await utils.humanDelay();
         return api.sendMessage(
           `🌐 System prefix: ${prefix}\n🛸 Your box chat prefix: ${prefix}`,
@@ -202,8 +203,41 @@ const listen = ({ api }) => {
           event.messageID
         );
       }
+      // --- NEW: Handle non-prefix "ai" command ---
+      else if (lowerCaseBody.startsWith("ai ")) {
+        const promptText = event.body.slice(3).trim(); // Extract text after "ai "
+        const commandName = "ai";
+        const command = global.client.commands.get(commandName);
 
-      if (event.body.startsWith(prefix)) {
+        if (!command || command.config.usePrefix === true) {
+            // This ensures we only handle the 'ai' command if it's explicitly set as non-prefix
+            logger.warn(`Non-prefix 'ai' command not found or misconfigured.`, "COMMAND_LOAD");
+            return api.sendMessage(`The 'ai' command is not properly configured.`, event.threadID, event.messageID);
+        }
+
+        // Check permissions for the 'ai' command if configured
+        if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
+            if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
+                api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
+                return;
+            }
+        }
+
+        try {
+            logger.log(`Executing non-prefix AI command with prompt: "${promptText}"`, "AI_COMMAND");
+            await utils.humanDelay();
+            // Pass the extracted prompt and original args (if any, though prompt is primary here)
+            await command.run({ api, event, args: promptText.split(/ +/), global, prompt: promptText });
+        } catch (e) {
+            logger.err(`Error executing non-prefix 'ai' command: ${e.message}`, "AI_COMMAND_EXEC");
+            api.sendMessage(`An error occurred while running the 'ai' command.`, event.threadID, event.messageID);
+        }
+      } else if (lowerCaseBody === "ai") { // Handle just "ai" with no prompt
+          await utils.humanDelay();
+          return api.sendMessage("Please provide a prompt after 'ai'. Example: ai What is the capital of France?", event.threadID, event.messageID);
+      }
+      // --- END NEW: Handle non-prefix "ai" command ---
+      else if (event.body.startsWith(prefix)) {
         const args = event.body.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift()?.toLowerCase();
 
