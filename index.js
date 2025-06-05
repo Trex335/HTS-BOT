@@ -40,7 +40,7 @@ const configJson = {
     ],
     "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
   },
-  "commandDisabled": ["ping.js"], // Disabled help and ping commands. Ensure "ai.js" is NOT here!
+  "commandDisabled": ["ping.js"], // Disabled help and ping commands. Ensure your non-prefix commands are NOT here!
   "eventDisabled": ["welcome.js"], // Disabled welcome event
   "BOTNAME": "Bot",
   "PREFIX": "?",
@@ -195,6 +195,7 @@ const listen = ({ api }) => {
       const lowerCaseBody = event.body.toLowerCase();
       const prefix = global.config.PREFIX;
 
+      // Handle the special 'prefix' command first
       if (lowerCaseBody === "prefix") {
         await utils.humanDelay();
         return api.sendMessage(
@@ -203,41 +204,61 @@ const listen = ({ api }) => {
           event.messageID
         );
       }
-      // --- NEW: Handle non-prefix "ai" command ---
-      else if (lowerCaseBody.startsWith("ai ")) {
-        const promptText = event.body.slice(3).trim(); // Extract text after "ai "
-        const commandName = "ai";
-        const command = global.client.commands.get(commandName);
 
-        if (!command || command.config.usePrefix === true) {
-            // This ensures we only handle the 'ai' command if it's explicitly set as non-prefix
-            logger.warn(`Non-prefix 'ai' command not found or misconfigured.`, "COMMAND_LOAD");
-            return api.sendMessage(`The 'ai' command is not properly configured.`, event.threadID, event.messageID);
-        }
+      let commandFoundAndExecuted = false;
 
-        // Check permissions for the 'ai' command if configured
-        if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
-            if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
-                api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
-                return;
-            }
-        }
+      // --- NEW: General check for non-prefix commands ---
+      for (const cmdName of global.client.nonPrefixCommands) {
+          // Check if message body is exactly the command name OR starts with the command name followed by a space
+          if (lowerCaseBody === cmdName || lowerCaseBody.startsWith(`${cmdName} `)) {
+              // Retrieve the command module using its original case-sensitive name from global.client.commands
+              // We need the original name to get it from the map, as map keys are case-sensitive.
+              // So we find the command that has this lowercased name.
+              let foundCommand = null;
+              for (const [key, cmdModule] of global.client.commands.entries()) {
+                  if (key.toLowerCase() === cmdName && cmdModule.config.usePrefix === false) {
+                      foundCommand = cmdModule;
+                      break;
+                  }
+              }
 
-        try {
-            logger.log(`Executing non-prefix AI command with prompt: "${promptText}"`, "AI_COMMAND");
-            await utils.humanDelay();
-            // Pass the extracted prompt and original args (if any, though prompt is primary here)
-            await command.run({ api, event, args: promptText.split(/ +/), global, prompt: promptText });
-        } catch (e) {
-            logger.err(`Error executing non-prefix 'ai' command: ${e.message}`, "AI_COMMAND_EXEC");
-            api.sendMessage(`An error occurred while running the 'ai' command.`, event.threadID, event.messageID);
-        }
-      } else if (lowerCaseBody === "ai") { // Handle just "ai" with no prompt
-          await utils.humanDelay();
-          return api.sendMessage("Please provide a prompt after 'ai'. Example: ai What is the capital of France?", event.threadID, event.messageID);
+              if (foundCommand) {
+                  // Extract the prompt/arguments for the non-prefix command
+                  const promptText = lowerCaseBody.startsWith(`${cmdName} `) ? event.body.slice(cmdName.length + 1).trim() : "";
+                  const args = promptText.split(/ +/).filter(Boolean); // Filter(Boolean) removes empty strings
+
+                  // Check permissions for the non-prefix command
+                  if (foundCommand.config.hasPermssion !== undefined && foundCommand.config.hasPermssion > 0) {
+                      if (foundCommand.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
+                          api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
+                          commandFoundAndExecuted = true;
+                          break; // Stop checking other non-prefix commands
+                      }
+                  }
+
+                  try {
+                      logger.log(`Executing non-prefix command: ${cmdName} with prompt: "${promptText}"`, "NON_PREFIX_COMMAND");
+                      await utils.humanDelay();
+                      // Pass the extracted prompt (full string after command name) and args (split by space)
+                      await foundCommand.run({ api, event, args, global, prompt: promptText });
+                      commandFoundAndExecuted = true;
+                  } catch (e) {
+                      logger.err(`Error executing non-prefix command '${cmdName}': ${e.message}`, "NON_PREFIX_EXEC");
+                      api.sendMessage(`An error occurred while running the '${cmdName}' command.`, event.threadID, event.messageID);
+                      commandFoundAndExecuted = true;
+                  }
+                  break; // Stop checking other non-prefix commands once one is found and handled
+              }
+          }
       }
-      // --- END NEW: Handle non-prefix "ai" command ---
-      else if (event.body.startsWith(prefix)) {
+
+      if (commandFoundAndExecuted) {
+          return; // Don't process as a prefixed command if a non-prefix one was found and handled
+      }
+      // --- END NEW: General check for non-prefix commands ---
+
+      // Existing prefixed command logic
+      if (event.body.startsWith(prefix)) {
         const args = event.body.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift()?.toLowerCase();
 
@@ -572,7 +593,8 @@ global.client = {
     }
   },
   timeStart: Date.now(),
-  lastActivityTime: Date.now() // Initialize last activity time
+  lastActivityTime: Date.now(), // Initialize last activity time
+  nonPrefixCommands: new Set() // NEW: To store names of commands that don't need a prefix
 };
 
 global.data = {
@@ -797,6 +819,11 @@ async function onBot() {
         if (global.client.commands.has(config.name)) {
           logger.err(`[ COMMAND ] ${chalk.hex("#FFFF00")(command)} Module is already loaded!`, "COMMAND");
           continue;
+        }
+
+        // NEW: If the command is designated as non-prefix, add its lowercase name to the set
+        if (config.usePrefix === false) {
+            global.client.nonPrefixCommands.add(config.name.toLowerCase());
         }
 
         if (module.onLoad) {
