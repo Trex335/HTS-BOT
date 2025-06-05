@@ -40,8 +40,8 @@ const configJson = {
     ],
     "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
   },
-  "commandDisabled": ["ping.js"], // Disabled help and ping commands
-  "eventDisabled": ["welcome.js"], // Disabled welcome event
+  "commandDisabled": ["ping.js"],
+  "eventDisabled": ["welcome.js"],
   "BOTNAME": "Bot",
   "PREFIX": "?",
   "ADMINBOT": [
@@ -63,16 +63,16 @@ const configJson = {
   "FCAOption": {
     "forceLogin": false,
     "listenEvents": true,
-    "autoMarkDelivery": true, // Mark messages as delivered
-    "autoMarkRead": true,     // Mark messages as read
-    "logLevel": "silent",     // Reduce log verbosity for production
+    "autoMarkDelivery": true,
+    "autoMarkRead": true,
+    "logLevel": "silent",
     "selfListen": false,
     "online": true,
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", // More recent user agent
-    "autoReconnect": true,    // Enable auto-reconnect
-    "autoRestore": true,      // Restore session after disconnect
-    "syncUp": true,           // Sync up with Facebook server
-    "delay": 500              // Add a slight delay to API calls
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "autoReconnect": true,
+    "autoRestore": true,
+    "syncUp": true,
+    "delay": 500
   },
   "daily": {
     "cooldownTime": 43200000,
@@ -109,14 +109,14 @@ const configJson = {
     "autoUnsend": true,
     "delayUnsend": 60
   },
-  "humanLikeDelay": { // New configuration for human-like delays
-    "min": 1000, // Minimum delay in milliseconds
-    "max": 5000  // Maximum delay in milliseconds
+  "humanLikeDelay": {
+    "min": 1000,
+    "max": 5000
   },
-  "randomActivity": { // New configuration for random activities
+  "randomActivity": {
     "status": true,
-    "intervalMin": 30, // Minimum interval in minutes
-    "intervalMax": 120 // Maximum interval in minutes
+    "intervalMin": 30,
+    "intervalMax": 120
   }
 };
 
@@ -180,15 +180,11 @@ const listen = ({ api }) => {
       // Potentially attempt to re-login on specific errors
       if (error.error === 'Not logged in') {
         logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        // You might want to implement a more robust re-login mechanism here
         // For simplicity, we'll just exit and let the process manager restart it.
         process.exit(1);
       }
       return; // Don't process if there's a listen error
     }
-
-    // Logger for all incoming events (optional, can be noisy)
-    // logger.log(`Received event: ${JSON.stringify(event)}`, "LISTENER");
 
     // Command Handling
     if (event.type === "message" && event.body) {
@@ -211,7 +207,7 @@ const listen = ({ api }) => {
 
         if (!command) {
           return api.sendMessage(
-            `⚠️ The command "<span class="math-inline">\{prefix\}</span>{commandName}" does not exist.\n` +
+            `⚠️ The command "${prefix}${commandName}" does not exist.\n` +
             `Type ${prefix}help to see all available commands.`,
             event.threadID,
             event.messageID
@@ -259,13 +255,9 @@ const listen = ({ api }) => {
 const customScript = ({ api }) => {
   logger.log("Running custom script...", "CUSTOM");
 
-  const minInterval = 5;
-  let lastMessageTime = 0;
-  let messagedThreads = new Set();
-
   const autoStuffConfig = {
     autoRestart: {
-      status: true, // <--- CHANGED TO TRUE FOR PERIODIC RESTART
+      status: true,
       time: 40,
       note: 'To avoid problems, enable periodic bot restarts',
     },
@@ -307,54 +299,8 @@ const customScript = ({ api }) => {
   autoRestart(autoStuffConfig.autoRestart);
   acceptPending(autoStuffConfig.acceptPending);
 
-  // AUTOGREET EVERY 10 MINUTES
-  cron.schedule('*/10 * * * *', () => {
-    const currentTime = Date.now();
-    if (currentTime - lastMessageTime < minInterval) {
-      return;
-    }
-    api.getThreadList(25, null, ['INBOX'], async (err, data) => {
-      if (err) return console.error("Error [Thread List Cron]: " + err);
-      let i = 0;
-      let j = 0;
-
-      async function message(thread) {
-        try {
-          await utils.humanDelay(); // Delay before sending message
-          api.sendMessage({
-            body: `🤖 Hassan Bot Activated!\n\n📩 For any concerns, kindly contact Hassan:\n🔗 https://www.facebook.com/profile.php?id=61555393416824\n\n✅ Thank you for using Hassan Bot!`
-          }, thread.threadID, (err) => {
-            if (err) return;
-            messagedThreads.add(thread.threadID);
-          });
-        } catch (error) {
-          console.error("Error sending a message:", error);
-        }
-      }
-
-      while (j < 20 && i < data.length) {
-        if (data[i].isGroup && data[i].name != data[i].threadID && !messagedThreads.has(data[i].threadID)) {
-          await message(data[i]);
-          j++;
-          const CuD = data[i].threadID;
-          setTimeout(() => {
-            messagedThreads.delete(CuD);
-          }, 1000); // Clear from messagedThreads after 1 second cooldown for re-greeting
-        }
-        i++;
-      }
-    });
-  }, {
-    scheduled: true,
-    timezone: "Asia/Dhaka"
-  });
-
-  // AUTOGREET EVERY 30 MINUTES
+  // AUTOGREET EVERY 30 MINUTES (modified from original)
   cron.schedule('*/30 * * * *', () => {
-    const currentTime = Date.now();
-    if (currentTime - lastMessageTime < minInterval) {
-      return;
-    }
     api.getThreadList(25, null, ['INBOX'], async (err, data) => {
       if (err) return console.error("Error [Thread List Cron]: " + err);
       let i = 0;
@@ -367,7 +313,6 @@ const customScript = ({ api }) => {
             body: `Hey There! How are you? ヾ(＾-＾)ノ`
           }, thread.threadID, (err) => {
             if (err) return;
-            messagedThreads.add(thread.threadID);
           });
         } catch (error) {
           console.error("Error sending a message:", error);
@@ -375,13 +320,9 @@ const customScript = ({ api }) => {
       }
 
       while (j < 20 && i < data.length) {
-        if (data[i].isGroup && data[i].name != data[i].threadID && !messagedThreads.has(data[i].threadID)) {
+        if (data[i].isGroup && data[i].name != data[i].threadID) {
           await message(data[i]);
           j++;
-          const CuD = data[i].threadID;
-          setTimeout(() => {
-            messagedThreads.delete(CuD);
-          }, 1000);
         }
         i++;
       }
@@ -412,19 +353,6 @@ const customScript = ({ api }) => {
                 // Send a "typing..." indicator
                 await api.sendTypingIndicator(randomThread.threadID);
                 logger.log(`Sent typing indicator in thread ${randomThread.threadID}`, "ACTIVITY");
-              },
-              async () => {
-                // React to a random message in the thread (if any recent messages)
-                const messages = await api.getThreadHistory(randomThread.threadID, 10);
-                if (messages && messages.length > 0) {
-                  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-                  const reactions = ['❤️', '😆', '👍', '😮', '😢', '😡'];
-                  const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
-                  await api.setMessageReaction(randomReaction, randomMessage.messageID, (err) => {
-                    if (err) logger.err(`Error reacting to message: ${err.message}`, "ACTIVITY");
-                    else logger.log(`Reacted with ${randomReaction} to message ${randomMessage.messageID} in thread ${randomThread.threadID}`, "ACTIVITY");
-                  }, true); // True to unsend previous reaction if any
-                }
               },
               async () => {
                 // Briefly go offline and back online
@@ -625,7 +553,7 @@ const { cra, cv, cb } = getThemeColors();
 // Mock language data for demonstration
 const mockLangFileContent = `
 commands.hello=Hello there!
-`; // Removed help and ping entries
+`;
 const langFile = mockLangFileContent.split(/\r?\n|\r/);
 const langData = langFile.filter(
   (item) => item.indexOf("#") != 0 && item != ""
@@ -835,46 +763,50 @@ async function onBot() {
         global.client.commands.set(config.name, module);
         logger.log(`${cra(`LOADED`)} ${cb(config.name)} success`, "COMMAND");
       } catch (error) {
-        logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(command)} fail ` + error, "COMMAND");
+        logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(command)} failed to load with error: ${error.message}`, "COMMAND_LOAD");
       }
     }
 
-    // --- Event Loading ---
-    const events = readdirSync(eventsPath).filter(
-      (ev) =>
-        ev.endsWith(".js") && !global.config.eventDisabled.includes(ev)
+    const listEvent = readdirSync(eventsPath).filter(
+      (event) =>
+        event.endsWith(".js") &&
+        !global.config.eventDisabled.includes(event)
     );
     console.log(cv(`\n` + `──LOADING EVENTS─●`));
-    for (const ev of events) {
+    for (const event of listEvent) {
       try {
-        const event = require(join(eventsPath, ev));
-        const { config, onLoad, run } = event;
-        if (!config || !config.name || !config.eventType || !run) {
-          logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail: Missing config, name, eventType, or run function.`, "EVENT");
+        const module = require(`${eventsPath}/${event}`);
+        const { config } = module;
+
+        if (!config?.name || !config?.eventType || !module.run) {
+          throw new Error(`[ EVENT ] ${event} is not in the correct format. Missing name, eventType, or run function.`);
+        }
+        if (global.client.events.has(config.name)) {
+          logger.err(`[ EVENT ] ${chalk.hex("#FFFF00")(event)} Module is already loaded!`, "EVENT");
           continue;
         }
 
-        if (onLoad) {
+        if (module.onLoad) {
           try {
-            await onLoad({ api });
+            await module.onLoad({ api });
           } catch (error) {
-            throw new Error("Unable to load the onLoad function of the event.");
+            throw new Error("Unable to load the onLoad function of the event module.");
           }
         }
-        global.client.events.set(config.name, event);
+        global.client.events.set(config.name, module);
         logger.log(`${cra(`LOADED`)} ${cb(config.name)} success`, "EVENT");
       } catch (error) {
-        logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail ` + error, "EVENT");
+        logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(event)} failed to load with error: ${error.message}`, "EVENT_LOAD");
       }
     }
 
-    // This line was already setting options, but it's important to have the latest options.
-    // It's good that it's here, but ensure the FCAOption object is fully configured before this point.
-    // global.client.api.setOptions(global.config.FCAOption); // This line is already called by login, so no need to call again unless dynamically changing options.
+    logger.log(`Total Commands Loaded: ${global.client.commands.size}`, "INFO");
+    logger.log(`Total Events Loaded: ${global.client.events.size}`, "INFO");
 
-    global.client.listenMqtt = global.client.api.listenMqtt(listen({ api: global.client.api }));
-    customScript({ api: global.client.api });
-    utils.complete();
+    global.loading.complete();
+    customScript({ api }); // Run custom scripts after bot initialization
+
+    api.listen(listen({ api }));
 
     // --- Send activation message to ADMINBOT IDs ---
     if (global.config.ADMINBOT && global.config.ADMINBOT.length > 0) {
