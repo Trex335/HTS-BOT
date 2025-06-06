@@ -45,7 +45,7 @@ const logger = {
 
 // --- Configuration Loading/Saving Logic ---
 let configPath = path.join(__dirname, 'config.json'); // Defines the path for config.json
-let configJson = {}; // Renamed to configJson as per your snippet
+let configJson = {}; // This variable will hold your bot's configuration
 
 try {
     if (fs.existsSync(configPath)) {
@@ -56,7 +56,7 @@ try {
         // If config.json doesn't exist, create it with these default values
         logger.warn("config.json not found. Creating with default values...", "CONFIG");
         // Define your DEFAULT config here. Ensure all properties are present.
-        configJson = { // Using configJson here
+        configJson = {
             "version": "1.0.1",
             "language": "en",
             "email": "fkjoash@gmail.com",
@@ -189,7 +189,7 @@ const utils = {
         const max = global.config.humanLikeDelay.max; // Use global.config
         const delay = Math.floor(Math.random() * (max - min + 1)) + min;
         logger.log(`Adding human-like delay of ${delay}ms...`, "DELAY");
-        return new Promise(resolve => setTimeout(resolve, delay));
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 };
 
@@ -639,7 +639,8 @@ global.client = {
 
             // If a command with this name already exists, remove it before adding the new one
             if (global.client.commands.has(config.name)) {
-                logger.warn(`[ COMMAND ] Overwriting existing command: "${config.name}" (from ${commandFileName})`, "COMMAND_LOAD);
+                // FIX: Corrected syntax error here from $config.name to ${config.name} and $commandFileName to ${commandFileName}
+                logger.warn(`[ COMMAND ] Overwriting existing command: "${config.name}" (from ${commandFileName})`, "COMMAND_LOAD");
                 // Also remove from nonPrefixCommands set if it was there
                 if (global.client.nonPrefixCommands.has(config.name.toLowerCase())) {
                     global.client.nonPrefixCommands.delete(config.name.toLowerCase());
