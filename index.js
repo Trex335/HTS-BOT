@@ -1,7 +1,7 @@
 const { exec, spawn } = require("child_process");
 const chalk = require("chalk");
 const check = require("get-latest-version");
-const fs = require("fs-extra");
+const fs = require("fs-extra"); // fs-extra is crucial for file operations
 const semver = require("semver");
 const { readdirSync, readFileSync, writeFileSync } = require("fs-extra");
 const { join, resolve } = require("path");
@@ -16,314 +16,330 @@ const axios = require('axios'); // For external API calls if needed
 // If you prefer another FCA fork (e.g., '@dongdev/fca-unofficial'), replace 'josh-fca' below.
 const login = require('josh-fca');
 
-// --- Configuration (Embedded from config.json, but you can move this to a separate file if needed) ---
-const configJson = {
-  "version": "1.0.1",
-  "language": "en",
-  "email": "fkjoash@gmail.com", // This will be used only if appstate.json is missing or invalid
-  "password": "sssaaa",           // This will be used only if appstate.json is missing or invalid
-  "useEnvForCredentials": false,
-  "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
-  "DeveloperMode": true,
-  "autoCreateDB": true,
-  "allowInbox": false,
-  "autoClean": true,
-  "adminOnly": false, // Set to true if you want the bot to only respond to ADMINBOT IDs (higher protection, limited functionality)
-  "encryptSt": false,
-  "removeSt": false,
-  "UPDATE": {
-    "Package": true,
-    "EXCLUDED": [
-      "chalk",
-      "mqtt",
-      "https-proxy-agent"
-    ],
-    "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
-  },
-  "commandDisabled": ["ping.js"], // Disabled help and ping commands. Ensure your non-prefix/both commands are NOT here!
-  "eventDisabled": ["welcome.js"], // Disabled welcome event
-  "BOTNAME": "Bot",
-  "PREFIX": "?",
-  "ADMINBOT": [
-    "61555393416824", // Replace with your Facebook User ID (Your ID from previous logs)
-    // "OTHER_FB_UID" // Replace with other Facebook User IDs if needed
-  ],
-  "DESIGN": {
-    "Title": "MTX-BOT",
-    "Theme": "Blue",
-    "Admin": "Hassan",
-    "Setup": {
-      "Info": "Design your own custom terminal Titlebar for the title and must contain no numbers",
-      "Theme": "Customize your console effortlessly with various theme colors. Explore Aqua, Fiery, Blue, Orange, Pink, Red, Retro, Sunlight, Teen, Summer, Flower, Ghost, Purple, Rainbow, and Hacker themes to enhance your terminal logs."
+// --- Configuration Loading/Saving Logic (NEW) ---
+let configPath = path.join(__dirname, 'config.json'); // Defines the path for config.json
+let configData = {}; // This variable will hold your bot's configuration
+
+try {
+    if (fs.existsSync(configPath)) {
+        // If config.json exists, read and parse it
+        configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        logger.loader("Loaded configuration from config.json.");
+    } else {
+        // If config.json doesn't exist, create it with these default values
+        logger.warn("config.json not found. Creating with default values...", "CONFIG");
+        // Define your DEFAULT config here. This MUST match the structure
+        // of your previous 'configJson' constant. Ensure all properties are present.
+        configData = {
+            "version": "1.0.1",
+            "language": "en",
+            "email": "fkjoash@gmail.com",
+            "password": "sssaaa",
+            "useEnvForCredentials": false,
+            "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
+            "DeveloperMode": true,
+            "autoCreateDB": true,
+            "allowInbox": false,
+            "autoClean": true,
+            "adminOnly": false, // Initial default for admin-only mode
+            "encryptSt": false,
+            "removeSt": false,
+            "UPDATE": {
+                "Package": true,
+                "EXCLUDED": ["chalk", "mqtt", "https-proxy-agent"],
+                "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
+            },
+            "commandDisabled": ["ping.js"],
+            "eventDisabled": ["welcome.js"],
+            "BOTNAME": "Bot",
+            "PREFIX": "?",
+            "ADMINBOT": [
+                "61555393416824" // IMPORTANT: Replace with YOUR Facebook User ID (e.g., "100001234567890")
+                // "OTHER_FB_UID" // Add other admin IDs if needed
+            ],
+            "DESIGN": {
+                "Title": "MTX-BOT",
+                "Theme": "Blue",
+                "Admin": "Hassan",
+                "Setup": {
+                    "Info": "Design your own custom terminal Titlebar for the title and must contain no numbers",
+                    "Theme": "Customize your console effortlessly with various theme colors. Explore Aqua, Fiery, Blue, Orange, Pink, Red, Retro, Sunlight, Teen, Summer, Flower, Ghost, Purple, Rainbow, and Hacker themes to enhance your terminal logs."
+                }
+            },
+            "APPSTATEPATH": "appstate.json",
+            "DEL_FUNCTION": false,
+            "ADD_FUNCTION": true,
+            "FCAOption": {
+                "forceLogin": false,
+                "listenEvents": true,
+                "autoMarkDelivery": true,
+                "autoMarkRead": true,
+                "logLevel": "silent",
+                "selfListen": false,
+                "online": true,
+                "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                "autoReconnect": true,
+                "autoRestore": true,
+                "syncUp": true,
+                "delay": 500
+            },
+            "daily": {
+                "cooldownTime": 43200000,
+                "rewardCoin": 500
+            },
+            "work": {
+                "cooldownTime": 1200000
+            },
+            "help": {
+                "autoUnsend": true,
+                "delayUnsend": 60
+            },
+            "adminUpdate": {
+                "autoUnsend": true,
+                "sendNoti": true,
+                "timeToUnsend": 10
+            },
+            "adminNoti": {
+                "autoUnsend": true,
+                "sendNoti": true,
+                "timeToUnsend": 10
+            },
+            "sing": {
+                "YOUTUBE_API": "AIzaSyCqox-KXEwDncsuo2HIpE0MF8J7ATln5Vc",
+                "SOUNDCLOUD_API": "M4TSyS6eV0AcMynXkA3qQASGcOFQTWub"
+            },
+            "video": {
+                "YOUTUBE_API": "AIzaSyDEE1-zZSRVI8lTaQOVsIAQFgL-_BJKVhk"
+            },
+            "audio": {
+                "YOUTUBE_API": "AIzaSyDEE1-zZSRVI8lTaQOVsIAQFgL-_BJKVhk"
+            },
+            "menu": {
+                "autoUnsend": true,
+                "delayUnsend": 60
+            },
+            "humanLikeDelay": {
+                "min": 1000,
+                "max": 5000
+            },
+            "randomActivity": {
+                "status": true,
+                "intervalMin": 30,
+                "intervalMax": 120
+            }
+        };
+        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf8'); // Save the new default config
+        logger.loader("Default config.json created.");
     }
-  },
-  "APPSTATEPATH": "appstate.json",
-  "DEL_FUNCTION": false,
-  "ADD_FUNCTION": true,
-  "FCAOption": {
-    "forceLogin": false,
-    "listenEvents": true,
-    "autoMarkDelivery": true, // Mark messages as delivered (appears more human)
-    "autoMarkRead": true,     // Mark messages as read (appears more human)
-    "logLevel": "silent",     // Reduce log verbosity for production
-    "selfListen": false,
-    "online": true,           // If set to 'false', bot will appear offline. Setting to 'true' is common but might slightly increase detection risk if Facebook monitors continuous online status from unusual IPs. 'randomActivity' function below already toggles this.
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", // More recent user agent for better mimicry
-    "autoReconnect": true,    // Enable auto-reconnect for stability
-    "autoRestore": true,      // Restore session after disconnect for stability
-    "syncUp": true,           // Sync up with Facebook server for stability
-    "delay": 500              // Add a slight delay to API calls (good for human-like timing)
-  },
-  "daily": {
-    "cooldownTime": 43200000,
-    "rewardCoin": 500
-  },
-  "work": {
-    "cooldownTime": 1200000
-  },
-  "help": {
-    "autoUnsend": true,
-    "delayUnsend": 60
-  },
-  "adminUpdate": {
-    "autoUnsend": true,
-    "sendNoti": true,
-    "timeToUnsend": 10
-  },
-  "adminNoti": {
-    "autoUnsend": true,
-    "sendNoti": true,
-    "timeToUnsend": 10
-  },
-  "sing": {
-    "YOUTUBE_API": "AIzaSyCqox-KXEwDncsuo2HIpE0MF8J7ATln5Vc",
-    "SOUNDCLOUD_API": "M4TSyS6eV0AcMynXkA3qQASGcOFQTWub"
-  },
-  "video": {
-    "YOUTUBE_API": "AIzaSyDEE1-zZSRVI8lTaQOVsIAQFgL-_BJKVhk"
-  },
-  "audio": {
-    "YOUTUBE_API": "AIzaSyDEE1-zZSRVI8lTaQOVsIAQFgL-_BJKVhk"
-  },
-  "menu": {
-    "autoUnsend": true,
-    "delayUnsend": 60
-  },
-  "humanLikeDelay": { // Configuration for human-like delays *before* command/event execution
-    "min": 1000, // Minimum delay in milliseconds (1 second)
-    "max": 5000  // Maximum delay in milliseconds (5 seconds) - Can increase for more caution
-  },
-  "randomActivity": { // Configuration for random activities to appear less like a bot
-    "status": true,
-    "intervalMin": 30, // Minimum interval in minutes for an activity to occur
-    "intervalMax": 120 // Maximum interval in minutes for an activity to occur
-  }
-};
+} catch (error) {
+    logger.err(`Error loading/creating config.json: ${error.message}`, "CONFIG_ERROR");
+    process.exit(1); // Exit if config can't be loaded/created
+}
 
 // --- UTILS ---
 const getThemeColors = () => {
-  return {
-    cra: chalk.hex("#FF0000"), // Red
-    cv: chalk.hex("#00FFFF"), // Cyan
-    cb: chalk.hex("#0000FF"), // Blue
-  };
+    return {
+        cra: chalk.hex("#FF0000"), // Red
+        cv: chalk.hex("#00FFFF"), // Cyan
+        cb: chalk.hex("#0000FF"), // Blue
+    };
 };
 
 const logger = {
-  log: (message, tag = "INFO") => {
-    const { cra, cv, cb } = getThemeColors();
-    console.log(`${cv(`[${tag}]`)} ${message}`);
-  },
-  loader: (message, tag = "LOADER") => {
-    const { cra, cv, cb } = getThemeColors();
-    console.log(`${cb(`[${tag}]`)} ${message}`);
-  },
-  err: (message, tag = "ERROR") => {
-    const { cra, cv, cb } = getThemeColors();
-    console.error(`${cra(`[${tag}]`)} ${message}`);
-  },
-  warn: (message, tag = "WARN") => {
-    const { cra, cv, cb } = getThemeColors();
-    console.warn(`${chalk.hex("#FFA500")(`[${tag}]`)} ${message}`); // Orange for warnings
-  }
+    log: (message, tag = "INFO") => {
+        const { cra, cv, cb } = getThemeColors();
+        console.log(`${cv(`[${tag}]`)} ${message}`);
+    },
+    loader: (message, tag = "LOADER") => {
+        const { cra, cv, cb } = getThemeColors();
+        console.log(`${cb(`[${tag}]`)} ${message}`);
+    },
+    err: (message, tag = "ERROR") => {
+        const { cra, cv, cb } = getThemeColors();
+        console.error(`${cra(`[${tag}]`)} ${message}`);
+    },
+    warn: (message, tag = "WARN") => {
+        const { cra, cv, cb } = getThemeColors();
+        console.warn(`${chalk.hex("#FFA500")(`[${tag}]`)} ${message}`); // Orange for warnings
+    }
 };
 
 const utils = {
-  decryptState: (encryptedState, key) => {
-    // Implement actual decryption if config.encryptSt is true
-    // For now, this is a placeholder and assumes non-encrypted state
-    return encryptedState;
-  },
-  encryptState: (state, key) => {
-    // Implement actual encryption if config.encryptSt is true
-    // For now, this is a placeholder and returns the state as is
-    return state;
-  },
-  complete: () => {
-    logger.log("Bot initialization complete!", "BOT");
-  },
-  // Utility for human-like delays before commands/events
-  humanDelay: async () => {
-    const min = global.config.humanLikeDelay.min;
-    const max = global.config.humanLikeDelay.max;
-    const delay = Math.floor(Math.random() * (max - min + 1)) + min;
-    logger.log(`Adding human-like delay of ${delay}ms...`, "DELAY");
-    return new Promise(resolve => setTimeout(resolve, delay));
-  }
+    decryptState: (encryptedState, key) => {
+        // Implement actual decryption if config.encryptSt is true
+        // For now, this is a placeholder and assumes non-encrypted state
+        return encryptedState;
+    },
+    encryptState: (state, key) => {
+        // Implement actual encryption if config.encryptSt is true
+        // For now, this is a placeholder and returns the state as is
+        return state;
+    },
+    complete: () => {
+        logger.log("Bot initialization complete!", "BOT");
+    },
+    // Utility for human-like delays before commands/events
+    humanDelay: async () => {
+        const min = global.config.humanLikeDelay.min;
+        const max = global.config.humanLikeDelay.max;
+        const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+        logger.log(`Adding human-like delay of ${delay}ms...`, "DELAY");
+        return new Promise(resolve => setTimeout(resolve, delay));
+    }
 };
 
 // --- LISTEN HANDLER ---
 const listen = ({ api }) => {
-  return async (error, event) => {
-    if (error) {
-      logger.err(`Listen error: ${error.message}`, "LISTENER_ERROR");
-      if (error.error === 'Not logged in') {
-        logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        process.exit(1);
-      }
-      return;
-    }
-
-    // If adminOnly is true, only process messages from ADMINBOT IDs
-    if (global.config.adminOnly && !global.config.ADMINBOT.includes(event.senderID)) {
-      // You can optionally send a message here indicating the bot is in admin-only mode
-      // api.sendMessage("I'm currently in admin-only mode and can only respond to my administrator.", event.threadID);
-      return; // Ignore messages from non-admin users
-    }
-
-    if (event.type === "message" && event.body) {
-      const lowerCaseBody = event.body.toLowerCase();
-      const prefix = global.config.PREFIX;
-
-      // Handle the special 'prefix' command first
-      if (lowerCaseBody === "prefix") {
-        await utils.humanDelay();
-        return api.sendMessage(
-          `🌐 System prefix: ${prefix}\n🛸 Your box chat prefix: ${prefix}`,
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      let commandFoundAndExecuted = false;
-
-      // --- Check for non-prefix commands ---
-      for (const cmdNameLower of global.client.nonPrefixCommands) {
-          // Check if message body is exactly the command name OR starts with the command name followed by a space
-          if (lowerCaseBody === cmdNameLower || lowerCaseBody.startsWith(`${cmdNameLower} `)) {
-              // Find the actual command module (case-sensitive)
-              let foundCommand = null;
-              for (const [key, cmdModule] of global.client.commands.entries()) {
-                  if (key.toLowerCase() === cmdNameLower && (cmdModule.config.usePrefix === false || cmdModule.config.usePrefix === "both")) {
-                      foundCommand = cmdModule;
-                      break;
-                  }
-              }
-
-              if (foundCommand) {
-                  // Extract the prompt/arguments for the non-prefix command
-                  const promptText = lowerCaseBody.startsWith(`${cmdNameLower} `) ? event.body.slice(cmdNameLower.length + 1).trim() : "";
-                  const args = promptText.split(/ +/).filter(Boolean); // Filter(Boolean) removes empty strings
-
-                  // Check permissions for the non-prefix command
-                  if (foundCommand.config.hasPermssion !== undefined && foundCommand.config.hasPermssion > 0) {
-                      if (foundCommand.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
-                          api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
-                          commandFoundAndExecuted = true;
-                          break; // Stop checking other non-prefix commands
-                      }
-                  }
-
-                  try {
-                      logger.log(`Executing non-prefix command: ${foundCommand.config.name} with prompt: "${promptText}"`, "NON_PREFIX_COMMAND");
-                      await utils.humanDelay();
-                      // Pass the extracted prompt (full string after command name) and args (split by space)
-                      await foundCommand.run({ api, event, args, global, prompt: promptText });
-                      commandFoundAndExecuted = true;
-                  } catch (e) {
-                      logger.err(`Error executing non-prefix command '${foundCommand.config.name}': ${e.message}`, "NON_PREFIX_EXEC");
-                      api.sendMessage(`An error occurred while running the '${foundCommand.config.name}' command.`, event.threadID, event.messageID);
-                      commandFoundAndExecuted = true;
-                  }
-                  break; // Stop checking other non-prefix commands once one is found and handled
-              }
-          }
-      }
-
-      if (commandFoundAndExecuted) {
-          return; // Don't process as a prefixed command if a non-prefix one was found and handled
-      }
-      // --- End check for non-prefix commands ---
-
-      // Existing prefixed command logic
-      if (event.body.startsWith(prefix)) {
-        const args = event.body.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift()?.toLowerCase();
-
-        if (!commandName) {
-          return api.sendMessage(
-            `⚠️ The command you are using does not exist.\n` +
-            `Type ${prefix}help to see all available commands.`,
-            event.threadID,
-            event.messageID
-          );
-        }
-
-        const command = global.client.commands.get(commandName);
-
-        if (!command) {
-          return api.sendMessage(
-            `⚠️ The command "${prefix}${commandName}" does not exist.\n` +
-            `Type ${prefix}help to see all available commands.`,
-            event.threadID,
-            event.messageID
-          );
-        }
-
-        // NEW: Only run prefixed command if it's explicitly true or "both"
-        if (command.config.usePrefix === false) { // It's a non-prefix only command, so ignore if used with prefix
-            return api.sendMessage(
-              `⚠️ The command "${command.config.name}" does not require a prefix.\n` +
-              `Just type "${command.config.name} ${command.config.usages.split('OR')[0].trim()}" to use it.`,
-              event.threadID,
-              event.messageID
-            );
-        }
-
-        try {
-          if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
-            if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
-              api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
-              return;
+    return async (error, event) => {
+        if (error) {
+            logger.err(`Listen error: ${error.message}`, "LISTENER_ERROR");
+            if (error.error === 'Not logged in') {
+                logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
+                process.exit(1);
             }
-          }
-
-          logger.log(`Executing command: ${command.config.name}`, "COMMAND");
-          await utils.humanDelay(); // Delay before command execution
-          // For prefixed commands, 'prompt' will be the entire argument string after the command name.
-          // 'args' will be the same string split by spaces.
-          const prefixedPrompt = args.join(" ");
-          await command.run({ api, event, args, global, prompt: prefixedPrompt });
-        } catch (e) {
-          logger.err(`Error executing command '${command.config.name}': ${e.message}`, "COMMAND_EXEC");
-          api.sendMessage(`An error occurred while running the '${command.config.name}' command.`, event.threadID, event.messageID);
+            return;
         }
-      }
-    }
 
-    // Event Handling
-    global.client.events.forEach(async (eventModule) => {
-      if (eventModule.config.eventType && eventModule.config.eventType.includes(event.type)) {
-        try {
-          logger.log(`Executing event: ${eventModule.config.name} for type ${event.type}`, "EVENT");
-          await utils.humanDelay(); // Delay before event execution
-          await eventModule.run({ api, event, global });
-        } catch (e) {
-          logger.err(`Error executing event '${eventModule.config.name}': ${e.message}`, "EVENT_EXEC");
+        // If adminOnly is true, only process messages from ADMINBOT IDs
+        if (global.config.adminOnly && !global.config.ADMINBOT.includes(event.senderID)) {
+            // You can optionally send a message here indicating the bot is in admin-only mode
+            // api.sendMessage("I'm currently in admin-only mode and can only respond to my administrator.", event.threadID);
+            return; // Ignore messages from non-admin users
         }
-      }
-    });
-  };
+
+        if (event.type === "message" && event.body) {
+            const lowerCaseBody = event.body.toLowerCase();
+            const prefix = global.config.PREFIX;
+
+            // Handle the special 'prefix' command first
+            if (lowerCaseBody === "prefix") {
+                await utils.humanDelay();
+                return api.sendMessage(
+                    `🌐 System prefix: ${prefix}\n🛸 Your box chat prefix: ${prefix}`,
+                    event.threadID,
+                    event.messageID
+                );
+            }
+
+            let commandFoundAndExecuted = false;
+
+            // --- Check for non-prefix commands ---
+            for (const cmdNameLower of global.client.nonPrefixCommands) {
+                // Check if message body is exactly the command name OR starts with the command name followed by a space
+                if (lowerCaseBody === cmdNameLower || lowerCaseBody.startsWith(`${cmdNameLower} `)) {
+                    // Find the actual command module (case-sensitive)
+                    let foundCommand = null;
+                    for (const [key, cmdModule] of global.client.commands.entries()) {
+                        if (key.toLowerCase() === cmdNameLower && (cmdModule.config.usePrefix === false || cmdModule.config.usePrefix === "both")) {
+                            foundCommand = cmdModule;
+                            break;
+                        }
+                    }
+
+                    if (foundCommand) {
+                        // Extract the prompt/arguments for the non-prefix command
+                        const promptText = lowerCaseBody.startsWith(`${cmdNameLower} `) ? event.body.slice(cmdNameLower.length + 1).trim() : "";
+                        const args = promptText.split(/ +/).filter(Boolean); // Filter(Boolean) removes empty strings
+
+                        // Check permissions for the non-prefix command
+                        if (foundCommand.config.hasPermssion !== undefined && foundCommand.config.hasPermssion > 0) {
+                            if (foundCommand.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
+                                api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
+                                commandFoundAndExecuted = true;
+                                break; // Stop checking other non-prefix commands
+                            }
+                        }
+
+                        try {
+                            logger.log(`Executing non-prefix command: ${foundCommand.config.name} with prompt: "${promptText}"`, "NON_PREFIX_COMMAND");
+                            await utils.humanDelay();
+                            // Pass the extracted prompt (full string after command name) and args (split by space)
+                            await foundCommand.run({ api, event, args, global, prompt: promptText });
+                            commandFoundAndExecuted = true;
+                        } catch (e) {
+                            logger.err(`Error executing non-prefix command '${foundCommand.config.name}': ${e.message}`, "NON_PREFIX_EXEC");
+                            api.sendMessage(`An error occurred while running the '${foundCommand.config.name}' command.`, event.threadID, event.messageID);
+                            commandFoundAndExecuted = true;
+                        }
+                        break; // Stop checking other non-prefix commands once one is found and handled
+                    }
+                }
+            }
+
+            if (commandFoundAndExecuted) {
+                return; // Don't process as a prefixed command if a non-prefix one was found and handled
+            }
+            // --- End check for non-prefix commands ---
+
+            // Existing prefixed command logic
+            if (event.body.startsWith(prefix)) {
+                const args = event.body.slice(prefix.length).trim().split(/ +/);
+                const commandName = args.shift()?.toLowerCase();
+
+                if (!commandName) {
+                    return api.sendMessage(
+                        `⚠️ The command you are using does not exist.\n` +
+                        `Type ${prefix}help to see all available commands.`,
+                        event.threadID,
+                        event.messageID
+                    );
+                }
+
+                const command = global.client.commands.get(commandName);
+
+                if (!command) {
+                    return api.sendMessage(
+                        `⚠️ The command "${prefix}${commandName}" does not exist.\n` +
+                        `Type ${prefix}help to see all available commands.`,
+                        event.threadID,
+                        event.messageID
+                    );
+                }
+
+                // NEW: Only run prefixed command if it's explicitly true or "both"
+                if (command.config.usePrefix === false) { // It's a non-prefix only command, so ignore if used with prefix
+                    return api.sendMessage(
+                        `⚠️ The command "${command.config.name}" does not require a prefix.\n` +
+                        `Just type "${command.config.name} ${command.config.usages.split('OR')[0].trim()}" to use it.`,
+                        event.threadID,
+                        event.messageID
+                    );
+                }
+
+                try {
+                    if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
+                        if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
+                            api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
+                            return;
+                        }
+                    }
+
+                    logger.log(`Executing command: ${command.config.name}`, "COMMAND");
+                    await utils.humanDelay(); // Delay before command execution
+                    // For prefixed commands, 'prompt' will be the entire argument string after the command name.
+                    // 'args' will be the same string split by spaces.
+                    const prefixedPrompt = args.join(" ");
+                    await command.run({ api, event, args, global, prompt: prefixedPrompt });
+                } catch (e) {
+                    logger.err(`Error executing command '${command.config.name}': ${e.message}`, "COMMAND_EXEC");
+                    api.sendMessage(`An error occurred while running the '${command.config.name}' command.`, event.threadID, event.messageID);
+                }
+            }
+        }
+
+        // Event Handling
+        global.client.events.forEach(async (eventModule) => {
+            if (eventModule.config.eventType && eventModule.config.eventType.includes(event.type)) {
+                try {
+                    logger.log(`Executing event: ${eventModule.config.name} for type ${event.type}`, "EVENT");
+                    await utils.humanDelay(); // Delay before event execution
+                    await eventModule.run({ api, event, global });
+                } catch (e) {
+                    logger.err(`Error executing event '${eventModule.config.name}': ${e.message}`, "EVENT_EXEC");
+                }
+            }
+        });
+    };
 };
 
 // --- CUSTOM SCRIPT (for auto-restart, auto-greeting etc.) ---
