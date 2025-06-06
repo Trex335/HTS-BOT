@@ -20,7 +20,7 @@ const login = require('josh-fca');
 const configJson = {
   "version": "1.0.1",
   "language": "en",
-  "email": "j05473413@gmail.com", // This will be used only if appstate.json is missing or invalid
+  "email": "fkjoash@gmail.com", // This will be used only if appstate.json is missing or invalid
   "password": "sssaaa",           // This will be used only if appstate.json is missing or invalid
   "useEnvForCredentials": false,
   "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
