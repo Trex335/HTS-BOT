@@ -32,7 +32,7 @@ const configJson = {
   "encryptSt": false,
   "removeSt": false,
   "UPDATE": {
-    "Package": true,
+    "Package": false, // MODIFIED: Changed to false to prevent automatic package updates
     "EXCLUDED": [
       "chalk",
       "mqtt",
@@ -64,15 +64,15 @@ const configJson = {
     "forceLogin": false,
     "listenEvents": true,
     "autoMarkDelivery": true, // Mark messages as delivered (appears more human)
-    "autoMarkRead": true,     // Mark messages as read (appears more human)
-    "logLevel": "silent",     // Reduce log verbosity for production
+    "autoMarkRead": true,      // Mark messages as read (appears more human)
+    "logLevel": "silent",      // Reduce log verbosity for production
     "selfListen": false,
-    "online": true,           // If set to 'false', bot will appear offline. Setting to 'true' is common but might slightly increase detection risk if Facebook monitors continuous online status from unusual IPs. 'randomActivity' function below already toggles this.
+    "online": true,            // If set to 'false', bot will appear offline. Setting to 'true' is common but might slightly increase detection risk if Facebook monitors continuous online status from unusual IPs. 'randomActivity' function below already toggles this.
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", // More recent user agent for better mimicry
-    "autoReconnect": true,    // Enable auto-reconnect for stability
-    "autoRestore": true,      // Restore session after disconnect for stability
-    "syncUp": true,           // Sync up with Facebook server for stability
-    "delay": 500              // Add a slight delay to API calls (good for human-like timing)
+    "autoReconnect": true,     // Enable auto-reconnect for stability
+    "autoRestore": true,       // Restore session after disconnect for stability
+    "syncUp": true,            // Sync up with Facebook server for stability
+    "delay": 500               // Add a slight delay to API calls (good for human-like timing)
   },
   "daily": {
     "cooldownTime": 43200000,
@@ -179,7 +179,8 @@ const listen = ({ api }) => {
       logger.err(`Listen error: ${error.message}`, "LISTENER_ERROR");
       if (error.error === 'Not logged in') {
         logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        process.exit(1);
+        // MODIFIED: Added a small delay before exiting to allow logs to flush
+        setTimeout(() => process.exit(1), 5000); // Exit after 5 seconds
       }
       return;
     }
@@ -336,7 +337,7 @@ const customScript = ({ api }) => {
 
   const autoStuffConfig = {
     autoRestart: {
-      status: false, // Keeping this false to avoid frequent server restarts that might appear suspicious
+      status: false, // KEPT FALSE: To avoid frequent server restarts.
       time: 40,
       note: 'To avoid problems, enable periodic bot restarts',
     },
@@ -351,7 +352,8 @@ const customScript = ({ api }) => {
     if (config.status) {
       cron.schedule(`*/${config.time} * * * *`, () => {
         logger.log('Start rebooting the system!', 'Auto Restart');
-        process.exit(1); // Exit with code 1 to indicate a restart
+        // MODIFIED: Added a small delay before exiting to allow logs to flush
+        setTimeout(() => process.exit(1), 5000); // Exit after 5 seconds
       });
     } else {
       logger.warn('Automatic bot restarts are disabled by configuration to reduce potential detection.', 'Auto Restart');
@@ -496,7 +498,8 @@ const delayedLog = async (message) => {
 const showMessage = async () => {
   const message =
     chalk.yellow(" ") +
-    `The "removeSt" property is set true in the config.json. Therefore, the Appstate was cleared effortlessly! You can now place a new one in the same directory.`;
+    `The "removeSt" property is set true in the config.json. Therefore, the Appstate was cleared effortlessly! You can now place a new one in the same directory.` +
+    `\n\nExiting in 10 seconds. Please re-run the bot with a new appstate.`; // Added clarity
   await delayedLog(message);
 };
 
@@ -504,9 +507,10 @@ const showMessage = async () => {
 if (configJson.removeSt) {
   fs.writeFileSync(fbstate, sign, { encoding: "utf8", flag: "w" });
   showMessage();
-  configJson.removeSt = false; // Only affect the current run for removal
+  // MODIFIED: Do not set configJson.removeSt to false here, as it's typically intended for a single-shot clear.
+  // The user would likely need to manually change it back in their config if they want to clear again.
   setTimeout(() => {
-    process.exit(0);
+    process.exit(0); // Exit with code 0 as it's a successful clear
   }, 10000);
 }
 
@@ -524,7 +528,8 @@ function nv(version) {
 }
 
 async function updatePackage(dependency, currentVersion, latestVersion) {
-  if (!configJson.UPDATE.EXCLUDED.includes(dependency)) {
+  // MODIFIED: Only execute if configJson.UPDATE.Package is true
+  if (configJson.UPDATE.Package && !configJson.UPDATE.EXCLUDED.includes(dependency)) {
     const ncv = nv(currentVersion);
 
     if (semver.neq(ncv, latestVersion)) {
@@ -539,8 +544,12 @@ async function updatePackage(dependency, currentVersion, latestVersion) {
 
       // This modifies the in-memory packageJson.dependencies.
       // To make it persistent, you'd need to write back to the physical package.json.
+      // However, for most production deployments, updates should be handled by CI/CD or manual `npm install` on the server.
       packageJson.dependencies[dependency] = `^${latestVersion}`;
 
+      // This `exec` call will update the package. If your environment has a mechanism to restart Node.js
+      // processes when `node_modules` change, this might cause a restart.
+      // Given config.UPDATE.Package is now false by default, this part should not run.
       exec(`npm install ${dependency}@latest`, (error, stdout, stderr) => {
         if (error) {
           console.error(chalk.red('Error executing npm install command:'), error);
@@ -549,6 +558,9 @@ async function updatePackage(dependency, currentVersion, latestVersion) {
         console.log(chalk.green('npm install output:'), stdout);
       });
     }
+  } else if (!configJson.UPDATE.Package) {
+    // This warning should be logged only once if the entire checkAndUpdate function is not run.
+    // Moved logging logic to checkAndUpdate function.
   }
 }
 
@@ -565,7 +577,7 @@ async function checkAndUpdate() {
       console.error('Error checking and updating dependencies:', error);
     }
   } else {
-    console.log(chalk.yellow(''), 'Update for packages is not enabled in configJson');
+    logger.log('Automatic package updates are disabled in config.json.', 'UPDATE'); // MODIFIED: Clearer log
   }
 }
 
@@ -644,7 +656,13 @@ global.client = {
       // Execute onLoad function if it exists
       if (module.onLoad) {
         try {
-          await module.onLoad({ api: global.client.api });
+          // Pass the API object to onLoad if it's available
+          if (global.client.api) {
+            await module.onLoad({ api: global.client.api });
+          } else {
+            logger.warn(`API not yet available for onLoad of ${commandFileName}. If this module needs API, it might not work correctly.`, "CMD_LOAD_WARN");
+            await module.onLoad({}); // Call without API if not ready
+          }
         } catch (error) {
           throw new Error(`Error in onLoad function of ${commandFileName}: ${error.message}`);
         }
@@ -760,21 +778,24 @@ async function onBot() {
     logger.err(`Can't find or parse the bot's appstate: ${e.message}`, "error");
     if (configJson.email && configJson.password) {
       logger.log("Attempting to log in with email/password from config.", "LOGIN");
-    } else if (configJson.useEnvForCredentials && process.env[configJson.email] && process.env[configJson.password]) {
+    } else if (configJson.useEnvForCredentials && process.env.FCA_EMAIL && process.env.FCA_PASSWORD) { // MODIFIED: Use common env variable names
       logger.log("Attempting to log in with email/password from environment variables.", "LOGIN");
+      configJson.email = process.env.FCA_EMAIL; // Ensure config uses env values if enabled
+      configJson.password = process.env.FCA_PASSWORD;
     } else {
       logger.err("No valid appstate or credentials found. Exiting.", "LOGIN");
-      return process.exit(0);
+      // MODIFIED: Add a delay before exit
+      return setTimeout(() => process.exit(0), 5000);
     }
   }
 
   // Determine login data based on appState or credentials
   if (appState) {
     loginData = { appState: appState };
-  } else if (configJson.useEnvForCredentials && process.env[configJson.email] && process.env[configJson.password]) {
+  } else if (configJson.useEnvForCredentials && process.env.FCA_EMAIL && process.env.FCA_PASSWORD) { // MODIFIED: Use common env variable names
     loginData = {
-      email: process.env[configJson.email],
-      password: process.env[configJson.password],
+      email: process.env.FCA_EMAIL,
+      password: process.env.FCA_PASSWORD,
     };
   } else if (configJson.email && configJson.password) {
       loginData = {
@@ -783,7 +804,8 @@ async function onBot() {
       };
   } else {
       logger.err("No valid appstate or credentials found. Exiting.", "LOGIN");
-      return process.exit(0);
+      // MODIFIED: Add a delay before exit
+      return setTimeout(() => process.exit(0), 5000);
   }
 
   // Add the FCA options to the login function
@@ -810,7 +832,7 @@ async function onBot() {
       if (err.error === 'login-approval' || err.error === 'Login approval needed') {
           logger.err("Login approval needed. Please approve the login from your Facebook account in a web browser, then try again.", "LOGIN_FAILED");
       } else if (err.error === 'Incorrect username/password.') {
-          logger.err("Incorrect email or password. Please check your config.json or environment variables.", "LOGIN_FAILED");
+          logger.err("Incorrect email or password. Please check your config.json or environment variables (FCA_EMAIL, FCA_PASSWORD).", "LOGIN_FAILED"); // MODIFIED: Added env var names
       } else if (err.error === 'The account is temporarily unavailable.') {
           logger.err("The account is temporarily unavailable. This might be a temporary Facebook block. Try logging into Facebook in a browser to clear any flags, then try again.", "LOGIN_FAILED");
       } else if (err.error.includes('error retrieving userID') || err.error.includes('from an unknown location')) {
@@ -819,7 +841,8 @@ async function onBot() {
       else {
           logger.err(`Fatal login error: ${err.message || JSON.stringify(err)}. Try logging into Facebook in a browser to resolve security issues.`, "LOGIN_FAILED");
       }
-      return process.exit(0);
+      // MODIFIED: Add a small delay before exiting to allow logs to flush
+      return setTimeout(() => process.exit(0), 5000);
     }
 
     // Save new appstate only if login was successful and appState was initially used or generated
