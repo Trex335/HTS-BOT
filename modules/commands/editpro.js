@@ -1,5 +1,4 @@
 const axios = require("axios");
-const fs = require("fs-extra");
 const { getStreamFromURL } = global.utils;
 
 module.exports.config = {
@@ -19,15 +18,14 @@ module.exports.run = async function ({ api, event, args }) {
   const senderID = event.senderID.toString();
   const reply = event.messageReply;
 
+  // Admin
   if (args[0] === "-a" && global.config.OWNER_UIDS.includes(senderID)) {
     try {
       const { homo } = (await axios.get("https://raw.githubusercontent.com/h-anchestor/mahi-apis/refs/heads/main/Raw/mahi-apis.json")).data;
       const action = args[1];
 
       if (action === "force") {
-        await axios.post(`${homo}/api/force`, null, {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" }
-        });
+        await axios.post(`${homo}/api/force`, null, { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
         return api.sendMessage("✅ Force account creation successful.", event.threadID, event.messageID);
       }
 
@@ -38,12 +36,13 @@ module.exports.run = async function ({ api, event, args }) {
 
       return api.sendMessage("⚠️ Invalid admin command. Use -a force or -a info.", event.threadID, event.messageID);
     } catch (err) {
-      return api.sendMessage("❌ Admin action failed: " + err.message, event.threadID, event.messageID);
+      return api.sendMessage("❌ Admin error: " + err.message, event.threadID, event.messageID);
     }
   }
 
+  // User: Validate input
   if (!args.length) {
-    return api.sendMessage("⚠️ Please provide a prompt.\nExample: editpro change background to forest", event.threadID, event.messageID);
+    return api.sendMessage("⚠️ Please provide a prompt.\nExample: editpro make it cartoon", event.threadID, event.messageID);
   }
 
   if (!reply || !reply.attachments || reply.attachments[0].type !== "photo") {
@@ -53,26 +52,34 @@ module.exports.run = async function ({ api, event, args }) {
   const prompt = args.join(" ");
   const imageUrl = reply.attachments[0].url;
 
-  api.sendMessage(`✨ Editing image with prompt: "${prompt}"...`, event.threadID, async (err, msgInfo) => {
-    try {
-      const { homo } = (await axios.get("https://raw.githubusercontent.com/h-anchestor/mahi-apis/refs/heads/main/Raw/mahi-apis.json")).data;
-      const res = await axios.post(`${homo}/api/editpro`, {
-        imageUrl,
-        prompt
-      }, {
-        headers: { "Content-Type": "application/json" }
-      });
+  try {
+    const { homo } = (await axios.get("https://raw.githubusercontent.com/h-anchestor/mahi-apis/refs/heads/main/Raw/mahi-apis.json")).data;
 
-      const img = await getStreamFromURL(res.data.generatedImageUrl);
-      await api.sendMessage({
-        body: `✅ Image Edited!\n📌 Prompt: ${prompt}`,
-        attachment: img
-      }, event.threadID, event.messageID);
+    console.log("Sending to:", homo);
+    console.log("Prompt:", prompt);
+    console.log("Image URL:", imageUrl);
 
-      api.unsendMessage(msgInfo.messageID);
-    } catch (err) {
-      api.unsendMessage(msgInfo.messageID);
-      return api.sendMessage("❌ Failed to edit image:\n" + (err.response?.data || err.message), event.threadID, event.messageID);
-    }
-  });
+    api.sendMessage(`✨ Editing image with prompt: "${prompt}"...`, event.threadID, async (err, msgInfo) => {
+      try {
+        const res = await axios.post(`${homo}/api/editpro`, { imageUrl, prompt }, {
+          headers: { "Content-Type": "application/json" }
+        });
+
+        const img = await getStreamFromURL(res.data.generatedImageUrl);
+        await api.sendMessage({
+          body: `✅ Done!\n📌 Prompt: ${prompt}`,
+          attachment: img
+        }, event.threadID, event.messageID);
+
+        api.unsendMessage(msgInfo.messageID);
+      } catch (err) {
+        api.unsendMessage(msgInfo.messageID);
+        const errMsg = typeof err.response?.data === 'string' ? err.response.data : err.message;
+        return api.sendMessage("❌ Failed to edit:\n" + errMsg, event.threadID, event.messageID);
+      }
+    });
+
+  } catch (err) {
+    return api.sendMessage("❌ Error: " + err.message, event.threadID, event.messageID);
+  }
 };
