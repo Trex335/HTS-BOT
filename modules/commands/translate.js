@@ -50,7 +50,7 @@ module.exports = {
             vi: "Dịch văn bản sang ngôn ngữ mong muốn",
             en: "Translate text to the desired language"
         },
-        category: "utility", // Category for help command organization
+        commandCategory: "utility", // FIX: Changed from 'category' to 'commandCategory' to match index.js validation
         guide: { // Usage guide for the command
             vi: "   {pn} <văn bản>: Dịch văn bản sang ngôn ngữ của box chat bạn hoặc ngôn ngữ mặc định của bot"
                 + "\n   {pn} <văn bản> -> <ISO 639-1>: Dịch văn bản sang ngôn ngữ mong muốn"
