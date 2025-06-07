@@ -7,19 +7,20 @@ module.exports = {
         name: "dalle3",
         aliases: ["dalle"],
         version: "1.0",
-        author: "Hassan", // Your author name
-        countDown: 15, // Cooldown in seconds
-        role: 0, // 0 for everyone, 1 for admin
+        author: "Hassan",
+        countDown: 15,
+        role: 0,
         shortDescription: "Generate images by Dalle3",
         longDescription: "Generate images by Dalle3",
         commandCategory: "download", // FIX: Changed from 'category' to 'commandCategory' to match index.js validation
+        usePrefix: true, // FIX: Added usePrefix property, assuming it requires a prefix
         guide: {
             en: "{pn} prompt"
         }
     },
 
     // This command uses 'onStart' as its main execution function, which index.js now supports
-    onStart: async function ({ api, event, args, message }) { // Added 'message' to params for compatibility
+    onStart: async function ({ api, event, args, message }) { // 'message' parameter is for compatibility with some helper functions
         const { threadID, messageID } = event;
         const prompt = args.join(" ");
 
