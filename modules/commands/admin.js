@@ -7,6 +7,7 @@ module.exports = {
     config: {
         name: "admin",
         aliases: ["a", "adm"],
+        credits: "Hassan",
         description: "Manages bot administrators (list, add, remove).",
         usage: "admin list OR admin add <user ID> OR admin remove <user ID>",
         commandCategory: "Admin",
