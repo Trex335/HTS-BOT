@@ -13,7 +13,7 @@ const axios = require('axios'); // For external API calls if needed
 
 const login = require('josh-fca');
 
-// Define defaultEmojiTranslate early so it's available for mockLangFileContent
+// Define defaultEmojiTranslate early so it's accessible within mockLangFileContent
 const defaultEmojiTranslate = "🌐";
 
 // --- Configuration (Embedded from config.json, but you can move this to a separate file if needed) ---
@@ -716,6 +716,7 @@ global.client = {
       const module = require(fullPath);
       const { config } = module;
 
+      // This is the crucial validation part
       if (!config?.name || !config?.commandCategory || !config?.hasOwnProperty("usePrefix") || !module.run) {
         throw new Error(`Invalid command format: Missing name, category, usePrefix, or run function.`);
       }
@@ -740,7 +741,7 @@ global.client = {
                 api: global.client.api,
                 threadsData: global.data.threads, // Pass threadsData to onLoad
                 getLang: global.getText, // Pass getLang
-                commandName: config.name // Pass commandName
+                commandName: config.name
             });
           } else {
             logger.warn(`API not yet available for onLoad of ${commandFileName}. If this module needs API, it might not work correctly.`, "CMD_LOAD_WARN");
@@ -751,10 +752,6 @@ global.client = {
         }
       }
 
-      // Register event handler if it exists (for onChat, onReaction)
-      // This is now handled more explicitly in the listen function.
-      // Modules with onChat will be called for messages.
-      // Modules with onReaction will have their handlers stored in global.client.onReaction.
       if (module.onChat || module.onReaction) { // Register if it has any event-like function
           if (!global.client.eventRegistered.includes(config.name)) {
               global.client.eventRegistered.push(config.name);
