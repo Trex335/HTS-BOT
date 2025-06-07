@@ -20,7 +20,7 @@ const defaultEmojiTranslate = "🌐";
 const configJson = {
   "version": "1.0.1",
   "language": "en",
-  "email": "j05473413@gmail.com",
+  "email": "jo5473413@gmail.com",
   "password": "sssaaa",
   "useEnvForCredentials": false,
   "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
@@ -282,7 +282,9 @@ const listen = ({ api }) => {
       const lowerCaseBody = event.body ? event.body.toLowerCase() : '';
       const prefix = global.config.PREFIX;
 
-      // Handle the special 'prefix' command first
+      let commandFoundAndExecuted = false;
+
+      // Handle the special 'prefix' command first (before any other commands)
       if (lowerCaseBody === "prefix") {
         await utils.humanDelay();
         return api.sendMessage(
@@ -292,7 +294,6 @@ const listen = ({ api }) => {
         );
       }
 
-      let commandFoundAndExecuted = false;
 
       // --- Check for non-prefix commands ---
       for (const cmdNameLower of global.client.nonPrefixCommands) {
@@ -325,18 +326,22 @@ const listen = ({ api }) => {
                   }
 
                   try {
-                      logger.log(`Executing non-prefix command: ${foundCommand.config.name} with prompt: "${promptText}"`, "NON_PREFIX_COMMAND");
+                      logger.log(`Executing non-prefix command: ${foundCommand.config.name}`, "NON_PREFIX_COMMAND"); // No prompt in log
                       await utils.humanDelay();
-                      await foundCommand.run({
-                          api,
-                          event,
-                          args,
-                          global,
-                          prompt: promptText,
-                          threadsData: global.data.threads, // Pass threadsData
-                          getLang: global.getText, // Pass getLang
-                          commandName: foundCommand.config.name // Pass commandName
-                      });
+                      // Call run OR onStart depending on which is defined
+                      if (foundCommand.run) {
+                          await foundCommand.run({
+                              api, event, args, global, prompt: promptText,
+                              threadsData: global.data.threads, getLang: global.getText, commandName: foundCommand.config.name,
+                              message: { reply: (msg, cb) => api.sendMessage(msg, event.threadID, event.messageID, cb), unsend: (mid) => api.unsendMessage(mid) } // Pass message object for compatibility
+                          });
+                      } else if (foundCommand.onStart) { // If onStart exists, call it
+                          await foundCommand.onStart({
+                              api, event, args, global, prompt: promptText,
+                              threadsData: global.data.threads, getLang: global.getText, commandName: foundCommand.config.name,
+                              message: { reply: (msg, cb) => api.sendMessage(msg, event.threadID, event.messageID, cb), unsend: (mid) => api.unsendMessage(mid) } // Pass message object for compatibility
+                          });
+                      }
                       commandFoundAndExecuted = true;
                   } catch (e) {
                       logger.err(`Error executing non-prefix command '${foundCommand.config.name}': ${e.message}`, "NON_PREFIX_EXEC");
@@ -383,7 +388,7 @@ const listen = ({ api }) => {
         if (command.config.usePrefix === false) {
             return api.sendMessage(
               `⚠️ The command "${command.config.name}" does not require a prefix.\n` +
-              `Just type "${command.config.name} ${command.config.usages.split('OR')[0].trim()}" to use it.`,
+              `Just type "${command.config.name} ${command.config.guide ? command.config.guide.en.split('OR')[0].trim() : ''}" to use it.`, // Adjusted for guide.en
               event.threadID,
               event.messageID
             );
@@ -405,16 +410,20 @@ const listen = ({ api }) => {
           logger.log(`Executing command: ${command.config.name}`, "COMMAND");
           await utils.humanDelay();
           const prefixedPrompt = args.join(" ");
-          await command.run({
-              api,
-              event,
-              args,
-              global,
-              prompt: prefixedPrompt,
-              threadsData: global.data.threads, // Pass threadsData
-              getLang: global.getText, // Pass getLang
-              commandName: command.config.name // Pass commandName
-          });
+          // Call run OR onStart depending on which is defined
+          if (command.run) {
+              await command.run({
+                  api, event, args, global, prompt: prefixedPrompt,
+                  threadsData: global.data.threads, getLang: global.getText, commandName: command.config.name,
+                  message: { reply: (msg, cb) => api.sendMessage(msg, event.threadID, event.messageID, cb), unsend: (mid) => api.unsendMessage(mid) } // Pass message object for compatibility
+              });
+          } else if (command.onStart) { // If onStart exists, call it
+              await command.onStart({
+                  api, event, args, global, prompt: prefixedPrompt,
+                  threadsData: global.data.threads, getLang: global.getText, commandName: command.config.name,
+                  message: { reply: (msg, cb) => api.sendMessage(msg, event.threadID, event.messageID, cb), unsend: (mid) => api.unsendMessage(mid) } // Pass message object for compatibility
+              });
+          }
         } catch (e) {
           logger.err(`Error executing command '${command.config.name}': ${e.message}`, "COMMAND_EXEC");
           api.sendMessage(`An error occurred while running the '${command.config.name}' command.`, event.threadID, event.messageID);
@@ -543,7 +552,7 @@ const customScript = ({ api }) => {
   if (global.config.randomActivity.status) {
     cron.schedule('*/1 * * * *', async () => {
       const minInterval = global.config.randomActivity.intervalMin;
-      const maxInterval = global.config.randomActivity.maxInterval; // Corrected to maxInterval
+      const maxInterval = global.config.randomActivity.maxInterval;
       const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
 
       if (Date.now() - global.client.lastActivityTime > randomMinutes * 60 * 1000) {
@@ -716,10 +725,31 @@ global.client = {
       const module = require(fullPath);
       const { config } = module;
 
-      // This is the crucial validation part
-      if (!config?.name || !config?.commandCategory || !config?.hasOwnProperty("usePrefix") || !module.run) {
-        throw new Error(`Invalid command format: Missing name, category, usePrefix, or run function.`);
+      // --- FLEXIBLE VALIDATION ---
+      // 1. Ensure config object exists
+      if (!config || typeof config !== 'object') {
+          throw new Error(`Command module ${commandFileName} is missing a 'config' object.`);
       }
+      // 2. Ensure 'name' is always present
+      if (!config.name || typeof config.name !== 'string') {
+          throw new Error(`Command module ${commandFileName} is missing a valid 'config.name' property.`);
+      }
+      // 3. Ensure an execution function (run or onStart) is present
+      if (!module.run && !module.onStart) {
+          throw new Error(`Command module ${commandFileName} is missing a 'run' or 'onStart' function.`);
+      }
+
+      // Provide defaults if optional properties are missing
+      config.commandCategory = config.commandCategory || "Uncategorized"; // Default category
+      config.usePrefix = config.hasOwnProperty('usePrefix') ? config.usePrefix : true; // Default to true if not specified
+
+      // If 'category' was used instead of 'commandCategory', map it for backward compatibility
+      if (config.category && !config.commandCategory) {
+          config.commandCategory = config.category;
+          logger.warn(`Command ${config.name} is using deprecated 'config.category'. Please use 'config.commandCategory'.`, "CMD_LOAD_WARN");
+      }
+      // --- END FLEXIBLE VALIDATION ---
+
 
       if (global.client.commands.has(config.name)) {
         logger.warn(`[ COMMAND ] Overwriting existing command: "${config.name}" (from ${commandFileName})`, "COMMAND_LOAD");
@@ -907,11 +937,11 @@ async function onBot() {
     logLevel: global.config.FCAOption.logLevel,
     selfListen: global.config.FCAOption.selfListen,
     online: global.config.FCAOption.online,
-    userAgent: global.config.FCAOption.userAgent,
-    autoReconnect: global.config.FCAOption.autoReconnect,
-    autoRestore: global.config.FCAOption.autoRestore,
-    syncUp: global.config.FCAOption.syncUp,
-    delay: global.config.FCAOption.delay
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    autoReconnect: true,
+    autoRestore: true,
+    syncUp: true,
+    delay: 500
   };
 
   login(loginData, fcaLoginOptions, async (err, api) => {
@@ -988,10 +1018,21 @@ async function onBot() {
         const eventModule = require(join(eventsPath, ev));
         const { config, onLoad, run, onChat, onReaction } = eventModule; // Destructure onChat and onReaction
 
-        if (!config || !config.name || !config.eventType || !run) {
-          logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail: Missing config, name, eventType, or run function.`, "EVENT");
-          continue;
+        // Event module validation (similar flexibility as commands)
+        if (!config || typeof config !== 'object') {
+            logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail: Missing a 'config' object.`, "EVENT");
+            continue;
         }
+        if (!config.name || typeof config.name !== 'string') {
+            logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail: Missing a valid 'config.name' property.`, "EVENT");
+            continue;
+        }
+        // Events don't strictly need a 'run' but should have at least one handler or eventType
+        if (!config.eventType || (!run && !onChat && !onReaction)) {
+            logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail: Missing 'config.eventType' or a valid function (run/onChat/onReaction).`, "EVENT");
+            continue;
+        }
+
 
         if (onLoad) {
           try {
