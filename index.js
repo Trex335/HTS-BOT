@@ -6,22 +6,22 @@ const semver = require("semver");
 const { readdirSync, readFileSync, writeFileSync } = require("fs-extra");
 const { join, resolve } = require("path");
 const express = require("express");
-const path = require("path"); // Make sure path is required
+const path = require("path");
 const moment = require("moment-timezone");
 const cron = require("node-cron");
 const axios = require('axios'); // For external API calls if needed
 
-// >>> IMPORTANT CHANGE HERE: USING A REAL FCA LIBRARY <<<
-// Make sure you have installed 'josh-fca' by running: npm install josh-fca
-// If you prefer another FCA fork (e.g., '@dongdev/fca-unofficial'), replace 'josh-fca' below.
 const login = require('josh-fca');
+
+// Define defaultEmojiTranslate early so it's available for mockLangFileContent
+const defaultEmojiTranslate = "🌐";
 
 // --- Configuration (Embedded from config.json, but you can move this to a separate file if needed) ---
 const configJson = {
   "version": "1.0.1",
   "language": "en",
-  "email": "fkjoash@gmail.com", // This will be used only if appstate.json is missing or invalid
-  "password": "sssaaa",           // This will be used only if appstate.json is missing or invalid
+  "email": "fkjoash@gmail.com",
+  "password": "sssaaa",
   "useEnvForCredentials": false,
   "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
   "DeveloperMode": true,
@@ -32,7 +32,7 @@ const configJson = {
   "encryptSt": false,
   "removeSt": false,
   "UPDATE": {
-    "Package": false, // MODIFIED: Changed to false to prevent automatic package updates
+    "Package": false, // Changed to false to prevent automatic package updates
     "EXCLUDED": [
       "chalk",
       "mqtt",
@@ -40,13 +40,12 @@ const configJson = {
     ],
     "Info": "This section manages the bot's automatic package updates. To disable this function, set 'Package' to false. If you only want to exclude specific packages, set them to true and add them in the 'EXCLUDED' list."
   },
-  "commandDisabled": ["ping.js"], // Disabled help and ping commands. Ensure your non-prefix/both commands are NOT here!
-  "eventDisabled": ["welcome.js"], // Disabled welcome event
+  "commandDisabled": ["ping.js"],
+  "eventDisabled": ["welcome.js"],
   "BOTNAME": "Bot",
   "PREFIX": "?",
   "ADMINBOT": [
-    "61555393416824", // Replace with your Facebook User ID (Your ID from previous logs)
-    // "OTHER_FB_UID" // Replace with other Facebook User IDs if needed
+    "61555393416824", // Replace with your Facebook User ID
   ],
   "DESIGN": {
     "Title": "MTX-BOT",
@@ -63,16 +62,16 @@ const configJson = {
   "FCAOption": {
     "forceLogin": false,
     "listenEvents": true,
-    "autoMarkDelivery": true, // Mark messages as delivered (appears more human)
-    "autoMarkRead": true,      // Mark messages as read (appears more human)
-    "logLevel": "silent",      // Reduce log verbosity for production
+    "autoMarkDelivery": true,
+    "autoMarkRead": true,
+    "logLevel": "silent",
     "selfListen": false,
-    "online": true,            // If set to 'false', bot will appear offline. Setting to 'true' is common but might slightly increase detection risk if Facebook monitors continuous online status from unusual IPs. 'randomActivity' function below already toggles this.
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", // More recent user agent for better mimicry
-    "autoReconnect": true,     // Enable auto-reconnect for stability
-    "autoRestore": true,       // Restore session after disconnect for stability
-    "syncUp": true,            // Sync up with Facebook server for stability
-    "delay": 500               // Add a slight delay to API calls (good for human-like timing)
+    "online": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "autoReconnect": true,
+    "autoRestore": true,
+    "syncUp": true,
+    "delay": 500
   },
   "daily": {
     "cooldownTime": 43200000,
@@ -109,30 +108,29 @@ const configJson = {
     "autoUnsend": true,
     "delayUnsend": 60
   },
-  "humanLikeDelay": { // Configuration for human-like delays *before* command/event execution
-    "min": 1000, // Minimum delay in milliseconds (1 second)
-    "max": 5000  // Maximum delay in milliseconds (5 seconds) - Can increase for more caution
+  "humanLikeDelay": {
+    "min": 1000,
+    "max": 5000
   },
-  "randomActivity": { // Configuration for random activities to appear less like a bot
+  "randomActivity": {
     "status": true,
-    "intervalMin": 30, // Minimum interval in minutes for an activity to occur
-    "intervalMax": 120 // Maximum interval in minutes for an activity to occur
+    "intervalMin": 30,
+    "intervalMax": 120
   }
 };
 
-// MODIFIED: Global adminMode object, now part of global.config for consistency
+// Global adminMode object, now part of global.config for consistency
 global.adminMode = {
-    enabled: configJson.adminOnly, // Initialize from configJson.adminOnly
-    adminUserIDs: configJson.ADMINBOT // Directly reference the ADMINBOT array
+    enabled: configJson.adminOnly,
+    adminUserIDs: configJson.ADMINBOT
 };
-
 
 // --- UTILS ---
 const getThemeColors = () => {
   return {
-    cra: chalk.hex("#FF0000"), // Red
-    cv: chalk.hex("#00FFFF"), // Cyan
-    cb: chalk.hex("#0000FF"), // Blue
+    cra: chalk.hex("#FF0000"),
+    cv: chalk.hex("#00FFFF"),
+    cb: chalk.hex("#0000FF"),
   };
 };
 
@@ -151,25 +149,20 @@ const logger = {
   },
   warn: (message, tag = "WARN") => {
     const { cra, cv, cb } = getThemeColors();
-    console.warn(`${chalk.hex("#FFA500")(`[${tag}]`)} ${message}`); // Orange for warnings
+    console.warn(`${chalk.hex("#FFA500")(`[${tag}]`)} ${message}`);
   }
 };
 
 const utils = {
   decryptState: (encryptedState, key) => {
-    // Implement actual decryption if config.encryptSt is true
-    // For now, this is a placeholder and assumes non-encrypted state
     return encryptedState;
   },
   encryptState: (state, key) => {
-    // Implement actual encryption if config.encryptSt is true
-    // For now, this is a placeholder and returns the state as is
     return state;
   },
   complete: () => {
     logger.log("Bot initialization complete!", "BOT");
   },
-  // Utility for human-like delays before commands/events
   humanDelay: async () => {
     const min = global.config.humanLikeDelay.min;
     const max = global.config.humanLikeDelay.max;
@@ -179,6 +172,71 @@ const utils = {
   }
 };
 
+// Utility for managing thread-specific data, simplified for in-memory use
+// In a real production bot, this would be backed by a database (e.g., Firestore)
+function createThreadDataManager() {
+    const threadDataStore = new Map(); // Map<threadID, Map<path, value>>
+
+    return {
+        // get(threadID, path) - Supports dot notation for nested objects
+        get: async (threadID, path) => {
+            let current = threadDataStore.get(threadID);
+            if (!current) return undefined;
+
+            const pathParts = path.split('.');
+            for (const part of pathParts) {
+                if (current && typeof current === 'object' && current.has(part)) {
+                    current = current.get(part);
+                } else {
+                    return undefined;
+                }
+            }
+            return current;
+        },
+        // set(threadID, value, path) - Supports dot notation for nested objects
+        set: async (threadID, value, path) => {
+            if (!threadDataStore.has(threadID)) {
+                threadDataStore.set(threadID, new Map());
+            }
+            let current = threadDataStore.get(threadID);
+            const pathParts = path.split('.');
+            for (let i = 0; i < pathParts.length; i++) {
+                const part = pathParts[i];
+                if (i === pathParts.length - 1) {
+                    current.set(part, value);
+                } else {
+                    if (!current.has(part) || !(current.get(part) instanceof Map)) {
+                        current.set(part, new Map());
+                    }
+                    current = current.get(part);
+                }
+            }
+        },
+        // delete(threadID, path) - For cleanup (optional)
+        delete: async (threadID, path) => {
+            let current = threadDataStore.get(threadID);
+            if (!current) return;
+
+            const pathParts = path.split('.');
+            for (let i = 0; i < pathParts.length; i++) {
+                const part = pathParts[i];
+                if (i === pathParts.length - 1) {
+                    current.delete(part);
+                } else {
+                    if (!current.has(part) || !(current.get(part) instanceof Map)) {
+                        return;
+                    }
+                    current = current.get(part);
+                }
+            }
+            if (threadDataStore.get(threadID)?.size === 0) { // Check if the thread's map is empty
+                threadDataStore.delete(threadID); // Clean up empty thread settings
+            }
+        }
+    };
+}
+
+
 // --- LISTEN HANDLER ---
 const listen = ({ api }) => {
   return async (error, event) => {
@@ -186,22 +244,42 @@ const listen = ({ api }) => {
       logger.err(`Listen error: ${error.message}`, "LISTENER_ERROR");
       if (error.error === 'Not logged in') {
         logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        // MODIFIED: Added a small delay before exiting to allow logs to flush
-        setTimeout(() => process.exit(1), 5000); // Exit after 5 seconds
+        setTimeout(() => process.exit(1), 5000);
       }
       return;
     }
 
     // If adminOnly is true, only process messages from ADMINBOT IDs
-    // MODIFIED: Use global.adminMode.enabled and global.adminMode.adminUserIDs
     if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID)) {
-      // You can optionally send a message here indicating the bot is in admin-only mode
-      // api.sendMessage("I'm currently in admin-only mode and can only respond to my administrator.", event.threadID);
-      return; // Ignore messages from non-admin users
+      return;
     }
 
-    if (event.type === "message" && event.body) {
-      const lowerCaseBody = event.body.toLowerCase();
+    // --- Reaction Event Handling ---
+    if (event.type === "message_reaction") {
+        const reactionHandler = global.client.onReaction.get(event.messageID);
+        if (reactionHandler) {
+            const module = global.client.commands.get(reactionHandler.commandName) || global.client.events.get(reactionHandler.commandName);
+            if (module && module.onReaction) {
+                try {
+                    logger.log(`Executing reaction handler for ${module.config.name} (message ID: ${event.messageID})`, "REACTION_EVENT");
+                    await module.onReaction({
+                        api,
+                        event,
+                        Reaction: reactionHandler, // Pass the stored reaction data
+                        threadsData: global.data.threads,
+                        getLang: global.getText // Assuming getText is the language function
+                    });
+                } catch (e) {
+                    logger.err(`Error executing reaction handler for '${module.config.name}': ${e.message}`, "REACTION_EXEC_ERROR");
+                }
+            }
+        }
+        return; // Stop further processing for reaction events
+    }
+
+    // --- Message Event Handling (Commands & onChat events) ---
+    if (event.type === "message" || event.type === "message_reply") { // Added message_reply type
+      const lowerCaseBody = event.body ? event.body.toLowerCase() : '';
       const prefix = global.config.PREFIX;
 
       // Handle the special 'prefix' command first
@@ -218,9 +296,7 @@ const listen = ({ api }) => {
 
       // --- Check for non-prefix commands ---
       for (const cmdNameLower of global.client.nonPrefixCommands) {
-          // Check if message body is exactly the command name OR starts with the command name followed by a space
           if (lowerCaseBody === cmdNameLower || lowerCaseBody.startsWith(`${cmdNameLower} `)) {
-              // Find the actual command module (case-sensitive)
               let foundCommand = null;
               for (const [key, cmdModule] of global.client.commands.entries()) {
                   if (key.toLowerCase() === cmdNameLower && (cmdModule.config.usePrefix === false || cmdModule.config.usePrefix === "both")) {
@@ -230,55 +306,57 @@ const listen = ({ api }) => {
               }
 
               if (foundCommand) {
-                  // MODIFIED: Admin-only mode check for non-prefix commands
-                  // If adminMode is enabled and the user is NOT an admin AND the command is not an admin command
-                  if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID)) {
-                      // This check is already done at the top, but keeping it here for clarity per command type
-                      // This ensures general non-admin commands are blocked when in admin-only mode
-                      if (foundCommand.config.hasPermssion !== 1) { // If command is not an admin command
-                           api.sendMessage("🔒 The bot is in Admin-only mode. You can't use commands right now.", event.threadID, event.messageID);
-                           commandFoundAndExecuted = true;
-                           break;
-                      }
+                  // Admin-only mode check for non-prefix commands
+                  if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID) && foundCommand.config.hasPermssion !== 1) {
+                       api.sendMessage("🔒 The bot is in Admin-only mode. You can't use commands right now.", event.threadID, event.messageID);
+                       commandFoundAndExecuted = true;
+                       break;
                   }
 
-                  // Extract the prompt/arguments for the non-prefix command
                   const promptText = lowerCaseBody.startsWith(`${cmdNameLower} `) ? event.body.slice(cmdNameLower.length + 1).trim() : "";
-                  const args = promptText.split(/ +/).filter(Boolean); // Filter(Boolean) removes empty strings
+                  const args = promptText.split(/ +/).filter(Boolean);
 
-                  // Check permissions for the non-prefix command (specific command permission)
                   if (foundCommand.config.hasPermssion !== undefined && foundCommand.config.hasPermssion > 0) {
-                      // MODIFIED: Use global.adminMode.adminUserIDs for permission check
                       if (foundCommand.config.hasPermssion === 1 && !global.adminMode.adminUserIDs.includes(event.senderID)) {
                           api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
                           commandFoundAndExecuted = true;
-                          break; // Stop checking other non-prefix commands
+                          break;
                       }
                   }
 
                   try {
                       logger.log(`Executing non-prefix command: ${foundCommand.config.name} with prompt: "${promptText}"`, "NON_PREFIX_COMMAND");
                       await utils.humanDelay();
-                      // Pass the extracted prompt (full string after command name) and args (split by space)
-                      await foundCommand.run({ api, event, args, global, prompt: promptText });
+                      await foundCommand.run({
+                          api,
+                          event,
+                          args,
+                          global,
+                          prompt: promptText,
+                          threadsData: global.data.threads, // Pass threadsData
+                          getLang: global.getText, // Pass getLang
+                          commandName: foundCommand.config.name // Pass commandName
+                      });
                       commandFoundAndExecuted = true;
                   } catch (e) {
                       logger.err(`Error executing non-prefix command '${foundCommand.config.name}': ${e.message}`, "NON_PREFIX_EXEC");
                       api.sendMessage(`An error occurred while running the '${foundCommand.config.name}' command.`, event.threadID, event.messageID);
                       commandFoundAndExecuted = true;
                   }
-                  break; // Stop checking other non-prefix commands once one is found and handled
+                  break;
               }
           }
       }
 
       if (commandFoundAndExecuted) {
-          return; // Don't process as a prefixed command if a non-prefix one was found and handled
+          // If a command was found and executed (prefix or non-prefix), we're done.
+          // This prevents running onChat if a command was handled.
+          return;
       }
-      // --- End check for non-prefix commands ---
 
-      // Existing prefixed command logic
-      if (event.body.startsWith(prefix)) {
+
+      // --- Prefixed command logic ---
+      if (event.body && event.body.startsWith(prefix)) {
         const args = event.body.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift()?.toLowerCase();
 
@@ -302,8 +380,7 @@ const listen = ({ api }) => {
           );
         }
 
-        // NEW: Only run prefixed command if it's explicitly true or "both"
-        if (command.config.usePrefix === false) { // It's a non-prefix only command, so ignore if used with prefix
+        if (command.config.usePrefix === false) {
             return api.sendMessage(
               `⚠️ The command "${command.config.name}" does not require a prefix.\n` +
               `Just type "${command.config.name} ${command.config.usages.split('OR')[0].trim()}" to use it.`,
@@ -312,23 +389,13 @@ const listen = ({ api }) => {
             );
         }
 
-        // MODIFIED: Admin-only mode check for prefixed commands
-        // If adminMode is enabled and the user is NOT an admin AND the command is not an admin command
-        if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID)) {
-             if (command.config.hasPermssion !== 1) { // If command is not an admin command
-                return api.sendMessage("🔒 The bot is in Admin-only mode. You can't use commands right now.", event.threadID, event.messageID);
-             }
-        }
-        // This is the check you specifically asked for:
-        // Check if Admin-only mode is enabled and the user is not an admin (and the command is not itself an admin command)
+        // Admin-only mode check for prefixed commands
         if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID) && command.config.hasPermssion !== 1) {
             return api.sendMessage("🔒 The bot is in Admin-only mode. You can't use commands right now.", event.threadID, event.messageID);
         }
 
-
         try {
           if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
-            // MODIFIED: Use global.adminMode.adminUserIDs for permission check
             if (command.config.hasPermssion === 1 && !global.adminMode.adminUserIDs.includes(event.senderID)) {
               api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
               return;
@@ -336,30 +403,45 @@ const listen = ({ api }) => {
           }
 
           logger.log(`Executing command: ${command.config.name}`, "COMMAND");
-          await utils.humanDelay(); // Delay before command execution
-          // For prefixed commands, 'prompt' will be the entire argument string after the command name.
-          // 'args' will be the same string split by spaces.
+          await utils.humanDelay();
           const prefixedPrompt = args.join(" ");
-          await command.run({ api, event, args, global, prompt: prefixedPrompt });
+          await command.run({
+              api,
+              event,
+              args,
+              global,
+              prompt: prefixedPrompt,
+              threadsData: global.data.threads, // Pass threadsData
+              getLang: global.getText, // Pass getLang
+              commandName: command.config.name // Pass commandName
+          });
         } catch (e) {
           logger.err(`Error executing command '${command.config.name}': ${e.message}`, "COMMAND_EXEC");
           api.sendMessage(`An error occurred while running the '${command.config.name}' command.`, event.threadID, event.messageID);
         }
+        return; // Command handled, stop further message processing
       }
-    }
 
-    // Event Handling
-    global.client.events.forEach(async (eventModule) => {
-      if (eventModule.config.eventType && eventModule.config.eventType.includes(event.type)) {
-        try {
-          logger.log(`Executing event: ${eventModule.config.name} for type ${event.type}`, "EVENT");
-          await utils.humanDelay(); // Delay before event execution
-          await eventModule.run({ api, event, global });
-        } catch (e) {
-          logger.err(`Error executing event '${eventModule.config.name}': ${e.message}`, "EVENT_EXEC");
-        }
-      }
-    });
+      // --- onChat Event Handling for all non-command messages ---
+      global.client.events.forEach(async (eventModule) => {
+          // Check if the eventModule handles 'message' type events and has an onChat method
+          if (eventModule.config.eventType && eventModule.config.eventType.includes("message") && eventModule.onChat) {
+              try {
+                  logger.log(`Executing onChat event for: ${eventModule.config.name}`, "ON_CHAT_EVENT");
+                  // No human delay for onChat to keep it responsive, adjust if needed
+                  await eventModule.onChat({
+                      api,
+                      event,
+                      threadsData: global.data.threads, // Pass threadsData
+                      getLang: global.getText, // Pass getLang
+                      commandName: eventModule.config.name // Pass commandName
+                  });
+              } catch (e) {
+                  logger.err(`Error executing onChat event for '${eventModule.config.name}': ${e.message}`, "ON_CHAT_EXEC_ERROR");
+              }
+          }
+      });
+    }
   };
 };
 
@@ -373,7 +455,7 @@ const customScript = ({ api }) => {
 
   const autoStuffConfig = {
     autoRestart: {
-      status: false, // KEPT FALSE: To avoid frequent server restarts.
+      status: false,
       time: 40,
       note: 'To avoid problems, enable periodic bot restarts',
     },
@@ -388,8 +470,7 @@ const customScript = ({ api }) => {
     if (config.status) {
       cron.schedule(`*/${config.time} * * * *`, () => {
         logger.log('Start rebooting the system!', 'Auto Restart');
-        // MODIFIED: Added a small delay before exiting to allow logs to flush
-        setTimeout(() => process.exit(1), 5000); // Exit after 5 seconds
+        setTimeout(() => process.exit(1), 5000);
       });
     } else {
       logger.warn('Automatic bot restarts are disabled by configuration to reduce potential detection.', 'Auto Restart');
@@ -405,7 +486,7 @@ const customScript = ({ api }) => {
             ...(await api.getThreadList(1, null, ['OTHER'])),
           ];
           if (list[0]) {
-            await utils.humanDelay(); // Delay before sending message
+            await utils.humanDelay();
             api.sendMessage('You have been approved for the queue. (This is an automated message)', list[0].threadID);
           }
         } catch (e) {
@@ -418,9 +499,6 @@ const customScript = ({ api }) => {
   autoRestart(autoStuffConfig.autoRestart);
   acceptPending(autoStuffConfig.acceptPending);
 
-  // AUTOGREET EVERY 30 MINUTES
-  // This can also be a source of detection if too many greetings are sent too frequently.
-  // Consider disabling or making it less frequent if issues persist.
   cron.schedule('*/30 * * * *', () => {
     const currentTime = Date.now();
     if (currentTime - lastMessageTime < minInterval) {
@@ -433,7 +511,7 @@ const customScript = ({ api }) => {
 
       async function message(thread) {
         try {
-          await utils.humanDelay(); // Delay before sending message
+          await utils.humanDelay();
           api.sendMessage({
             body: `Hey There! How are you? ヾ(＾-＾)ノ`
           }, thread.threadID, (err) => {
@@ -462,32 +540,28 @@ const customScript = ({ api }) => {
     timezone: "Asia/Dhaka"
   });
 
-  // Random Human-like Activity: Toggles online status, marks as read.
   if (global.config.randomActivity.status) {
-    cron.schedule('*/1 * * * *', async () => { // Check every minute if an activity should occur
+    cron.schedule('*/1 * * * *', async () => {
       const minInterval = global.config.randomActivity.intervalMin;
-      const maxInterval = global.config.randomActivity.intervalMax;
-      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minMinutes;
+      const maxInterval = global.config.randomActivity.maxInterval; // Corrected to maxInterval
+      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
 
-      // Only perform activity if enough time has passed since the last one
       if (Date.now() - global.client.lastActivityTime > randomMinutes * 60 * 1000) {
         try {
           logger.log("Performing random human-like activity...", "ACTIVITY");
-          const threadList = await api.getThreadList(5, null, ['INBOX']); // Get a few recent threads
+          const threadList = await api.getThreadList(5, null, ['INBOX']);
           if (threadList.length > 0) {
             const randomThread = threadList[Math.floor(Math.random() * threadList.length)];
 
             const activities = [
               async () => {
-                // Briefly go offline and back online
                 await api.setOptions({ online: false });
                 logger.log("Temporarily set bot offline.", "ACTIVITY");
-                await new Promise(resolve => setTimeout(resolve, Math.random() * 5000 + 2000)); // Stay offline for 2-7 seconds
+                await new Promise(resolve => setTimeout(resolve, Math.random() * 5000 + 2000));
                 await api.setOptions({ online: true });
                 logger.log("Set bot back online.", "ACTIVITY");
               },
               async () => {
-                // Mark a random message as read
                 const messages = await api.getThreadHistory(randomThread.threadID, 5);
                 if (messages && messages.length > 0) {
                   const unreadMessages = messages.filter(msg => !msg.isRead);
@@ -503,7 +577,7 @@ const customScript = ({ api }) => {
             if (activities.length > 0) {
               const randomActivity = activities[Math.floor(Math.random() * activities.length)];
               await randomActivity();
-              global.client.lastActivityTime = Date.now(); // Update last activity time
+              global.client.lastActivityTime = Date.now();
             } else {
               logger.log("No random activities available after filtering.", "ACTIVITY");
             }
@@ -535,22 +609,18 @@ const showMessage = async () => {
   const message =
     chalk.yellow(" ") +
     `The "removeSt" property is set true in the config.json. Therefore, the Appstate was cleared effortlessly! You can now place a new one in the same directory.` +
-    `\n\nExiting in 10 seconds. Please re-run the bot with a new appstate.`; // Added clarity
+    `\n\nExiting in 10 seconds. Please re-run the bot with a new appstate.`;
   await delayedLog(message);
 };
 
-// Check if appstate.json should be removed based on configJson
 if (configJson.removeSt) {
   fs.writeFileSync(fbstate, sign, { encoding: "utf8", flag: "w" });
   showMessage();
-  // MODIFIED: Do not set configJson.removeSt to false here, as it's typically intended for a single-shot clear.
-  // The user would likely need to manually change it back in their config if they want to clear again.
   setTimeout(() => {
-    process.exit(0); // Exit with code 0 as it's a successful clear
+    process.exit(0);
   }, 10000);
 }
 
-// Load package.json for dependency checking
 let packageJson;
 try {
   packageJson = require("./package.json");
@@ -564,7 +634,6 @@ function nv(version) {
 }
 
 async function updatePackage(dependency, currentVersion, latestVersion) {
-  // MODIFIED: Only execute if configJson.UPDATE.Package is true
   if (configJson.UPDATE.Package && !configJson.UPDATE.EXCLUDED.includes(dependency)) {
     const ncv = nv(currentVersion);
 
@@ -577,15 +646,7 @@ async function updatePackage(dependency, currentVersion, latestVersion) {
           dependency
         )}. Updating to the latest version...`
       );
-
-      // This modifies the in-memory packageJson.dependencies.
-      // To make it persistent, you'd need to write back to the physical package.json.
-      // However, for most production deployments, updates should be handled by CI/CD or manual `npm install` on the server.
       packageJson.dependencies[dependency] = `^${latestVersion}`;
-
-      // This `exec` call will update the package. If your environment has a mechanism to restart Node.js
-      // processes when `node_modules` change, this might cause a restart.
-      // Given config.UPDATE.Package is now false by default, this part should not run.
       exec(`npm install ${dependency}@latest`, (error, stdout, stderr) => {
         if (error) {
           console.error(chalk.red('Error executing npm install command:'), error);
@@ -594,9 +655,6 @@ async function updatePackage(dependency, currentVersion, latestVersion) {
         console.log(chalk.green('npm install output:'), stdout);
       });
     }
-  } else if (!configJson.UPDATE.Package) {
-    // This warning should be logged only once if the entire checkAndUpdate function is not run.
-    // Moved logging logic to checkAndUpdate function.
   }
 }
 
@@ -613,55 +671,43 @@ async function checkAndUpdate() {
       console.error('Error checking and updating dependencies:', error);
     }
   } else {
-    logger.log('Automatic package updates are disabled in config.json.', 'UPDATE'); // MODIFIED: Clearer log
+    logger.log('Automatic package updates are disabled in config.json.', 'UPDATE');
   }
 }
 
 global.client = {
   commands: new Map(),
-  events: new Map(),
+  events: new Map(), // General event handlers
   cooldowns: new Map(),
   eventRegistered: [],
   handleSchedule: [],
-  handleReaction: [],
+  handleReaction: new Map(), // NEW: Map to store reaction handlers by messageID
   handleReply: [],
   mainPath: process.cwd(),
-  configPath: 'config.json', // Dummy path, config is embedded
+  configPath: 'config.json',
   getTime: function (option) {
     switch (option) {
-      case "seconds":
-        return `${moment.tz("Asia/Dhaka").format("ss")}`;
-      case "minutes":
-        return `${moment.tz("Asia/Dhaka").format("mm")}`;
-      case "hours":
-        return `${moment.tz("Asia/Dhaka").format("HH")}`;
-      case "date":
-        return `${moment.tz("Asia/Dhaka").format("DD")}`;
-      case "month":
-        return `${moment.tz("Asia/Dhaka").format("MM")}`;
-      case "year":
-        return `${moment.tz("Asia/Dhaka").format("YYYY")}`;
-      case "fullHour":
-        return `${moment.tz("Asia/Dhaka").format("HH:mm:ss")}`;
-      case "fullYear":
-        return `${moment.tz("Asia/Dhaka").format("DD/MM/YYYY")}`;
-      case "fullTime":
-        return `${moment.tz("Asia/Dhaka").format("HH:mm:ss DD/MM/YYYY")}`;
-      default:
-        return moment.tz("Asia/Dhaka").format();
+      case "seconds": return `${moment.tz("Asia/Dhaka").format("ss")}`;
+      case "minutes": return `${moment.tz("Asia/Dhaka").format("mm")}`;
+      case "hours": return `${moment.tz("Asia/Dhaka").format("HH")}`;
+      case "date": return `${moment.tz("Asia/Dhaka").format("DD")}`;
+      case "month": return `${moment.tz("Asia/Dhaka").format("MM")}`;
+      case "year": return `${moment.tz("Asia/Dhaka").format("YYYY")}`;
+      case "fullHour": return `${moment.tz("Asia/Dhaka").format("HH:mm:ss")}`;
+      case "fullYear": return `${moment.tz("Asia/Dhaka").format("DD/MM/YYYY")}`;
+      case "fullTime": return `${moment.tz("Asia/Dhaka").format("HH:mm:ss DD/MM/YYYY")}`;
+      default: return moment.tz("Asia/Dhaka").format();
     }
   },
   timeStart: Date.now(),
-  lastActivityTime: Date.now(), // Initialize last activity time
-  nonPrefixCommands: new Set(), // To store names of commands that don't need a prefix or use "both"
+  lastActivityTime: Date.now(),
+  nonPrefixCommands: new Set(),
 
-  // NEW: Function to dynamically load or reload a single command module
   loadCommand: async function(commandFileName) {
     const commandsPath = path.join(global.client.mainPath, 'modules', 'commands');
-    const fullPath = path.resolve(commandsPath, commandFileName); // Ensure full absolute path
+    const fullPath = path.resolve(commandsPath, commandFileName);
 
     try {
-      // Clear cache for the module to ensure latest version is loaded
       if (require.cache[require.resolve(fullPath)]) {
         delete require.cache[require.resolve(fullPath)];
         logger.log(`Cleared cache for: ${commandFileName}`, "CMD_CACHE");
@@ -674,17 +720,14 @@ global.client = {
         throw new Error(`Invalid command format: Missing name, category, usePrefix, or run function.`);
       }
 
-      // If a command with this name already exists, remove it before adding the new one
       if (global.client.commands.has(config.name)) {
         logger.warn(`[ COMMAND ] Overwriting existing command: "${config.name}" (from ${commandFileName})`, "COMMAND_LOAD");
-        // Also remove from nonPrefixCommands set if it was there
         if (global.client.nonPrefixCommands.has(config.name.toLowerCase())) {
             global.client.nonPrefixCommands.delete(config.name.toLowerCase());
         }
-        global.client.commands.delete(config.name); // Delete the old command
+        global.client.commands.delete(config.name);
       }
 
-      // Add to nonPrefixCommands if applicable
       if (config.usePrefix === false || config.usePrefix === "both") {
           global.client.nonPrefixCommands.add(config.name.toLowerCase());
       }
@@ -692,32 +735,40 @@ global.client = {
       // Execute onLoad function if it exists
       if (module.onLoad) {
         try {
-          // Pass the API object to onLoad if it's available
           if (global.client.api) {
-            await module.onLoad({ api: global.client.api });
+            await module.onLoad({
+                api: global.client.api,
+                threadsData: global.data.threads, // Pass threadsData to onLoad
+                getLang: global.getText, // Pass getLang
+                commandName: config.name // Pass commandName
+            });
           } else {
             logger.warn(`API not yet available for onLoad of ${commandFileName}. If this module needs API, it might not work correctly.`, "CMD_LOAD_WARN");
-            await module.onLoad({}); // Call without API if not ready
+            await module.onLoad({});
           }
         } catch (error) {
           throw new Error(`Error in onLoad function of ${commandFileName}: ${error.message}`);
         }
       }
-      // Register event handler if it exists
-      if (module.handleEvent && !global.client.eventRegistered.includes(config.name)) {
-          global.client.eventRegistered.push(config.name);
-      } else if (!module.handleEvent && global.client.eventRegistered.includes(config.name)) {
-          // If handleEvent was removed in an update, remove it from registered list
+
+      // Register event handler if it exists (for onChat, onReaction)
+      // This is now handled more explicitly in the listen function.
+      // Modules with onChat will be called for messages.
+      // Modules with onReaction will have their handlers stored in global.client.onReaction.
+      if (module.onChat || module.onReaction) { // Register if it has any event-like function
+          if (!global.client.eventRegistered.includes(config.name)) {
+              global.client.eventRegistered.push(config.name);
+          }
+      } else if (!module.onChat && !module.onReaction && global.client.eventRegistered.includes(config.name)) {
           global.client.eventRegistered = global.client.eventRegistered.filter(name => name !== config.name);
       }
 
-
       global.client.commands.set(config.name, module);
       logger.log(`${chalk.hex("#00FF00")(`LOADED`)} ${chalk.cyan(config.name)} (${commandFileName}) success`, "COMMAND_LOAD");
-      return true; // Indicate successful load
+      return true;
     } catch (error) {
       logger.err(`${chalk.hex("#FF0000")(`FAILED`)} to load ${chalk.yellow(commandFileName)}: ${error.message}`, "COMMAND_LOAD");
-      return false; // Indicate failure to load
+      return false;
     }
   }
 };
@@ -733,18 +784,18 @@ global.data = {
   allUserID: [],
   allCurrenciesID: [],
   allThreadID: [],
+  threads: createThreadDataManager() // NEW: Global thread data manager
 };
 
 global.utils = utils;
 global.loading = logger;
-global.nodemodule = {}; // This will hold loaded npm modules
-global.config = configJson; // Use the embedded configJson directly
+global.nodemodule = {};
+global.config = configJson;
 global.configModule = {};
 global.moduleData = [];
 global.language = {};
 global.account = {};
 
-// Load package dependencies into global.nodemodule
 for (const property in packageJson.dependencies) {
   try {
     global.nodemodule[property] = require(property);
@@ -758,6 +809,13 @@ const { cra, cv, cb } = getThemeColors();
 // Mock language data for demonstration
 const mockLangFileContent = `
 commands.hello=Hello there!
+translate.translateTo=🌐 Translate from %1 to %2
+translate.invalidArgument=❌ Invalid argument, please choose on or off
+translate.turnOnTransWhenReaction=✅ Turn on translate message when reaction, try to react "${defaultEmojiTranslate}" to any message to translate it (not support bot message)\\n Only translate message after turn on this feature
+translate.turnOffTransWhenReaction=✅ Turn off translate message when reaction
+translate.inputEmoji=🌀 Please react to this message to set that emoji as emoji to translate message
+translate.emojiSet=✅ Emoji to translate message is set to %1
+translate.guide=   {pn} <text>: Translate text to the language of your chat box or the default language of the bot\\n   {pn}  -> <ISO 639-1>: Translate text to the desired language\\n   or you can reply a message to translate the content of that message\\n   Example:\\n    {pn} hello -> vi\\n   {pn} -r [on | off]: Turn on or off the automatic translation mode when someone reacts to the message\\n   {pn} -r set : Set the emoji to translate the message in your chat group
 `;
 const langFile = mockLangFileContent.split(/\r?\n|\r/);
 const langData = langFile.filter(
@@ -770,19 +828,23 @@ for (const item of langData) {
   const head = itemKey.slice(0, itemKey.indexOf("."));
   const key = itemKey.replace(head + ".", "");
   const value = itemValue.replace(/\\n/gi, "\n");
+  if (typeof global.language == "undefined") global.language = {}; // Ensure global.language exists
   if (typeof global.language[head] == "undefined")
     global.language[head] = {};
   global.language[head][key] = value;
 }
 
+
 global.getText = function (...args) {
   const langText = global.language;
   if (!langText.hasOwnProperty(args[0])) {
-    throw new Error(`${__filename} - Not found key language: ${args[0]}`);
+    logger.warn(`Language key not found: ${args[0]}`, "LANG_WARN");
+    return `[Missing lang key: ${args[0]}.${args[1]}]`;
   }
   var text = langText[args[0]][args[1]];
   if (typeof text === "undefined") {
-    throw new Error(`${__filename} - Not found key text: ${args[1]}`);
+    logger.warn(`Text key not found: ${args[1]} for language ${args[0]}`, "LANG_WARN");
+    return `[Missing text: ${args[0]}.${args[1]}]`;
   }
   for (var i = args.length - 1; i > 0; i--) {
     const regEx = RegExp(`%${i}`, "g");
@@ -791,7 +853,6 @@ global.getText = function (...args) {
   return text;
 };
 
-// --- Bot Initialization ---
 async function onBot() {
   let loginData;
   const appStateFile = resolve(
@@ -802,7 +863,6 @@ async function onBot() {
   try {
     const rawAppState = fs.readFileSync(appStateFile, "utf8");
     if (rawAppState[0] !== "[") {
-      // Potentially encrypted
       appState = configJson.encryptSt
         ? JSON.parse(global.utils.decryptState(rawAppState, process.env.REPL_OWNER || process.env.PROCESSOR_IDENTIFIER))
         : JSON.parse(rawAppState);
@@ -814,21 +874,19 @@ async function onBot() {
     logger.err(`Can't find or parse the bot's appstate: ${e.message}`, "error");
     if (configJson.email && configJson.password) {
       logger.log("Attempting to log in with email/password from config.", "LOGIN");
-    } else if (configJson.useEnvForCredentials && process.env.FCA_EMAIL && process.env.FCA_PASSWORD) { // MODIFIED: Use common env variable names
+    } else if (configJson.useEnvForCredentials && process.env.FCA_EMAIL && process.env.FCA_PASSWORD) {
       logger.log("Attempting to log in with email/password from environment variables.", "LOGIN");
-      configJson.email = process.env.FCA_EMAIL; // Ensure config uses env values if enabled
+      configJson.email = process.env.FCA_EMAIL;
       configJson.password = process.env.FCA_PASSWORD;
     } else {
       logger.err("No valid appstate or credentials found. Exiting.", "LOGIN");
-      // MODIFIED: Add a delay before exit
       return setTimeout(() => process.exit(0), 5000);
     }
   }
 
-  // Determine login data based on appState or credentials
   if (appState) {
     loginData = { appState: appState };
-  } else if (configJson.useEnvForCredentials && process.env.FCA_EMAIL && process.env.FCA_PASSWORD) { // MODIFIED: Use common env variable names
+  } else if (configJson.useEnvForCredentials && process.env.FCA_EMAIL && process.env.FCA_PASSWORD) {
     loginData = {
       email: process.env.FCA_EMAIL,
       password: process.env.FCA_PASSWORD,
@@ -840,11 +898,9 @@ async function onBot() {
       };
   } else {
       logger.err("No valid appstate or credentials found. Exiting.", "LOGIN");
-      // MODIFIED: Add a delay before exit
       return setTimeout(() => process.exit(0), 5000);
   }
 
-  // Add the FCA options to the login function
   const fcaLoginOptions = {
     ...global.config.FCAOption,
     forceLogin: global.config.FCAOption.forceLogin,
@@ -861,14 +917,13 @@ async function onBot() {
     delay: global.config.FCAOption.delay
   };
 
-  login(loginData, fcaLoginOptions, async (err, api) => { // Pass fcaLoginOptions here
+  login(loginData, fcaLoginOptions, async (err, api) => {
     if (err) {
       console.error(err);
-      // More descriptive error for login failures, guiding the user to browser login
       if (err.error === 'login-approval' || err.error === 'Login approval needed') {
           logger.err("Login approval needed. Please approve the login from your Facebook account in a web browser, then try again.", "LOGIN_FAILED");
       } else if (err.error === 'Incorrect username/password.') {
-          logger.err("Incorrect email or password. Please check your config.json or environment variables (FCA_EMAIL, FCA_PASSWORD).", "LOGIN_FAILED"); // MODIFIED: Added env var names
+          logger.err("Incorrect email or password. Please check your config.json or environment variables (FCA_EMAIL, FCA_PASSWORD).", "LOGIN_FAILED");
       } else if (err.error === 'The account is temporarily unavailable.') {
           logger.err("The account is temporarily unavailable. This might be a temporary Facebook block. Try logging into Facebook in a browser to clear any flags, then try again.", "LOGIN_FAILED");
       } else if (err.error.includes('error retrieving userID') || err.error.includes('from an unknown location')) {
@@ -877,11 +932,9 @@ async function onBot() {
       else {
           logger.err(`Fatal login error: ${err.message || JSON.stringify(err)}. Try logging into Facebook in a browser to resolve security issues.`, "LOGIN_FAILED");
       }
-      // MODIFIED: Add a small delay before exiting to allow logs to flush
       return setTimeout(() => process.exit(0), 5000);
     }
 
-    // Save new appstate only if login was successful and appState was initially used or generated
     let newAppState;
     try {
         if (api.getAppState) {
@@ -899,29 +952,25 @@ async function onBot() {
         logger.err(`Error saving appstate: ${appStateError.message}`, "APPSTATE_SAVE_ERROR");
     }
 
-    // Ensure newAppState is checked for existence before accessing .map
     if (newAppState && Array.isArray(newAppState)) {
         global.account.cookie = newAppState.map((i) => (i = i.key + "=" + i.value)).join(";");
     } else {
         logger.warn("Could not set global.account.cookie. New appstate was not an array or was not retrieved.", "APPSTATE");
-        global.account.cookie = ""; // Set to empty string to avoid errors later
+        global.account.cookie = "";
     }
 
     global.client.api = api;
     global.config.version = configJson.version;
 
-    // --- Automatic File & Directory Creation ---
     const commandsPath = `${global.client.mainPath}/modules/commands`;
     const eventsPath = `${global.client.mainPath}/modules/events`;
     const includesCoverPath = `${global.client.mainPath}/includes/cover`;
 
-    // Ensure directories exist
     fs.ensureDirSync(commandsPath);
     fs.ensureDirSync(eventsPath);
     fs.ensureDirSync(includesCoverPath);
     logger.log("Ensured module directories exist.", "SETUP");
 
-    // --- Command Loading (now uses global.client.loadCommand) ---
     const listCommandFiles = readdirSync(commandsPath).filter(
       (commandFile) =>
         commandFile.endsWith(".js") &&
@@ -929,10 +978,9 @@ async function onBot() {
     );
     console.log(cv(`\n` + `──LOADING COMMANDS─●`));
     for (const commandFile of listCommandFiles) {
-      await global.client.loadCommand(commandFile); // Use the new dynamic loader
+      await global.client.loadCommand(commandFile);
     }
 
-    // --- Event Loading ---
     const events = readdirSync(eventsPath).filter(
       (ev) =>
         ev.endsWith(".js") && !global.config.eventDisabled.includes(ev)
@@ -940,8 +988,9 @@ async function onBot() {
     console.log(cv(`\n` + `──LOADING EVENTS─●`));
     for (const ev of events) {
       try {
-        const event = require(join(eventsPath, ev));
-        const { config, onLoad, run } = event;
+        const eventModule = require(join(eventsPath, ev));
+        const { config, onLoad, run, onChat, onReaction } = eventModule; // Destructure onChat and onReaction
+
         if (!config || !config.name || !config.eventType || !run) {
           logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail: Missing config, name, eventType, or run function.`, "EVENT");
           continue;
@@ -949,12 +998,17 @@ async function onBot() {
 
         if (onLoad) {
           try {
-            await onLoad({ api });
+            await onLoad({
+                api,
+                threadsData: global.data.threads,
+                getLang: global.getText,
+                commandName: config.name
+            });
           } catch (error) {
             throw new Error("Unable to load the onLoad function of the event.");
           }
         }
-        global.client.events.set(config.name, event);
+        global.client.events.set(config.name, eventModule); // Store the entire module
         logger.log(`${cra(`LOADED`)} ${cb(config.name)} success`, "EVENT");
       } catch (error) {
         logger.err(`${chalk.hex("#ff7100")(`LOADED`)} ${chalk.hex("#FFFF00")(ev)} fail ` + error, "EVENT");
@@ -965,11 +1019,10 @@ async function onBot() {
     customScript({ api: global.client.api });
     utils.complete();
 
-    // --- Send activation message to ADMINBOT IDs ---
     if (global.config.ADMINBOT && global.config.ADMINBOT.length > 0) {
-      const adminID = global.config.ADMINBOT[0]; // Assuming the first admin ID is your main ID
+      const adminID = global.config.ADMINBOT[0];
       try {
-        await utils.humanDelay(); // Delay before sending activation message
+        await utils.humanDelay();
         await api.sendMessage(
           `✅ Bot is now activated and running! Type '${global.config.PREFIX}help' to see commands.`,
           adminID
@@ -982,11 +1035,8 @@ async function onBot() {
   });
 }
 
-// --- Express Server for Uptime Robot ---
-// Define PORT early
 const PORT = process.env.PORT || 3000;
 
-// Function to start the Express server
 function startWebServer() {
   const app = express();
 
@@ -994,17 +1044,13 @@ function startWebServer() {
     res.status(200).send('Bot is awake and running!');
   });
 
-  app.listen(PORT, '0.0.0.0', () => { // Explicitly bind to '0.0.0.0' for Render
+  app.listen(PORT, '0.0.0.0', () => {
     logger.log(`Uptime Robot endpoint listening on port ${PORT}`, "SERVER");
   }).on('error', (err) => {
     logger.err(`Failed to start Express server: ${err.message}`, "SERVER_ERROR");
-    process.exit(1); // Exit if the server can't start
+    process.exit(1);
   });
 }
 
-// --- Main execution flow ---
-// 1. Start the web server first to ensure it's listening.
 startWebServer();
-
-// 2. Then, start the bot's Facebook login and listening process.
 onBot();
