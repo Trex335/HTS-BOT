@@ -1,4 +1,4 @@
-// modules/commands/admin.js - UPDATED with 'remove' functionality
+// modules/commands/admin.js - UPDATED with more robust ID validation
 
 const fs = require('fs-extra');
 const path = require('path');
@@ -10,7 +10,7 @@ module.exports = {
         credits: "Hassan",
         description: "Manages bot administrators (list, add, remove).",
         usage: "admin list OR admin add <user ID> OR admin remove <user ID>",
-        commandCategory: "Admin",
+        commandCategory: "Admin", // Ensure this matches index.js's expectation
         hasPermssion: 1, // Only actual administrators can use this command
         usePrefix: true, // Requires prefix
         cooldown: 5
@@ -25,6 +25,12 @@ module.exports = {
         }
 
         const subCommand = args[0]?.toLowerCase();
+
+        // Helper function for more robust ID validation
+        const isValidFacebookID = (idString) => {
+            // Check if it's not empty and contains only digits
+            return idString && /^\d+$/.test(idString);
+        };
 
         switch (subCommand) {
             case "list":
@@ -48,9 +54,9 @@ module.exports = {
                 }
                 const newAdminID = args[1].trim();
 
-                // Basic validation for ID
-                if (isNaN(newAdminID) || newAdminID.length < 15) { // Basic check for Facebook User ID format
-                    return api.sendMessage("Invalid User ID. Please provide a valid numeric Facebook User ID.", threadID, messageID);
+                // Modified validation for ID
+                if (!isValidFacebookID(newAdminID)) {
+                    return api.sendMessage("Invalid User ID format. Please provide a numeric Facebook User ID (e.g., '100001234567890').", threadID, messageID);
                 }
 
                 // Check against the live global.config.ADMINBOT
@@ -87,9 +93,9 @@ module.exports = {
                 }
                 const removeAdminID = args[1].trim();
 
-                // Basic validation for ID
-                if (isNaN(removeAdminID) || removeAdminID.length < 15) {
-                    return api.sendMessage("Invalid User ID. Please provide a valid numeric Facebook User ID to remove.", threadID, messageID);
+                // Modified validation for ID
+                if (!isValidFacebookID(removeAdminID)) {
+                    return api.sendMessage("Invalid User ID format. Please provide a numeric Facebook User ID to remove (e.g., '100001234567890').", threadID, messageID);
                 }
 
                 // Prevent self-removal
