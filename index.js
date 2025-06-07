@@ -120,6 +120,13 @@ const configJson = {
   }
 };
 
+// MODIFIED: Global adminMode object, now part of global.config for consistency
+global.adminMode = {
+    enabled: configJson.adminOnly, // Initialize from configJson.adminOnly
+    adminUserIDs: configJson.ADMINBOT // Directly reference the ADMINBOT array
+};
+
+
 // --- UTILS ---
 const getThemeColors = () => {
   return {
@@ -186,7 +193,8 @@ const listen = ({ api }) => {
     }
 
     // If adminOnly is true, only process messages from ADMINBOT IDs
-    if (global.config.adminOnly && !global.config.ADMINBOT.includes(event.senderID)) {
+    // MODIFIED: Use global.adminMode.enabled and global.adminMode.adminUserIDs
+    if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID)) {
       // You can optionally send a message here indicating the bot is in admin-only mode
       // api.sendMessage("I'm currently in admin-only mode and can only respond to my administrator.", event.threadID);
       return; // Ignore messages from non-admin users
@@ -222,13 +230,26 @@ const listen = ({ api }) => {
               }
 
               if (foundCommand) {
+                  // MODIFIED: Admin-only mode check for non-prefix commands
+                  // If adminMode is enabled and the user is NOT an admin AND the command is not an admin command
+                  if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID)) {
+                      // This check is already done at the top, but keeping it here for clarity per command type
+                      // This ensures general non-admin commands are blocked when in admin-only mode
+                      if (foundCommand.config.hasPermssion !== 1) { // If command is not an admin command
+                           api.sendMessage("🔒 The bot is in Admin-only mode. You can't use commands right now.", event.threadID, event.messageID);
+                           commandFoundAndExecuted = true;
+                           break;
+                      }
+                  }
+
                   // Extract the prompt/arguments for the non-prefix command
                   const promptText = lowerCaseBody.startsWith(`${cmdNameLower} `) ? event.body.slice(cmdNameLower.length + 1).trim() : "";
                   const args = promptText.split(/ +/).filter(Boolean); // Filter(Boolean) removes empty strings
 
-                  // Check permissions for the non-prefix command
+                  // Check permissions for the non-prefix command (specific command permission)
                   if (foundCommand.config.hasPermssion !== undefined && foundCommand.config.hasPermssion > 0) {
-                      if (foundCommand.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
+                      // MODIFIED: Use global.adminMode.adminUserIDs for permission check
+                      if (foundCommand.config.hasPermssion === 1 && !global.adminMode.adminUserIDs.includes(event.senderID)) {
                           api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
                           commandFoundAndExecuted = true;
                           break; // Stop checking other non-prefix commands
@@ -291,9 +312,24 @@ const listen = ({ api }) => {
             );
         }
 
+        // MODIFIED: Admin-only mode check for prefixed commands
+        // If adminMode is enabled and the user is NOT an admin AND the command is not an admin command
+        if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID)) {
+             if (command.config.hasPermssion !== 1) { // If command is not an admin command
+                return api.sendMessage("🔒 The bot is in Admin-only mode. You can't use commands right now.", event.threadID, event.messageID);
+             }
+        }
+        // This is the check you specifically asked for:
+        // Check if Admin-only mode is enabled and the user is not an admin (and the command is not itself an admin command)
+        if (global.adminMode.enabled && !global.adminMode.adminUserIDs.includes(event.senderID) && command.config.hasPermssion !== 1) {
+            return api.sendMessage("🔒 The bot is in Admin-only mode. You can't use commands right now.", event.threadID, event.messageID);
+        }
+
+
         try {
           if (command.config.hasPermssion !== undefined && command.config.hasPermssion > 0) {
-            if (command.config.hasPermssion === 1 && !global.config.ADMINBOT.includes(event.senderID)) {
+            // MODIFIED: Use global.adminMode.adminUserIDs for permission check
+            if (command.config.hasPermssion === 1 && !global.adminMode.adminUserIDs.includes(event.senderID)) {
               api.sendMessage("You don't have permission to use this command.", event.threadID, event.messageID);
               return;
             }
@@ -431,7 +467,7 @@ const customScript = ({ api }) => {
     cron.schedule('*/1 * * * *', async () => { // Check every minute if an activity should occur
       const minInterval = global.config.randomActivity.intervalMin;
       const maxInterval = global.config.randomActivity.intervalMax;
-      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+      const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minMinutes;
 
       // Only perform activity if enough time has passed since the last one
       if (Date.now() - global.client.lastActivityTime > randomMinutes * 60 * 1000) {
