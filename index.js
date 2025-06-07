@@ -20,7 +20,7 @@ const defaultEmojiTranslate = "🌐";
 const configJson = {
   "version": "1.0.1",
   "language": "en",
-  "email": "fkjoash@gmail.com",
+  "email": "j05473413@gmail.com",
   "password": "sssaaa",
   "useEnvForCredentials": false,
   "envGuide": "When useEnvForCredentials enabled, it will use the process.env key provided for email and password, which helps hide your credentials, you can find env in render's environment tab, you can also find it in replit secrets.",
