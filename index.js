@@ -169,6 +169,24 @@ const utils = {
     const delay = Math.floor(Math.random() * (max - min + 1)) + min;
     logger.log(`Adding human-like delay of ${delay}ms...`, "DELAY");
     return new Promise(resolve => setTimeout(resolve, delay));
+  },
+  // --- IMPORTANT: Placeholder for findUid ---
+  // You need to implement this function to resolve Facebook profile URLs to UIDs.
+  // This typically requires scraping or using an external API.
+  findUid: async (profileUrl) => {
+    // This is a conceptual example. A real implementation is needed.
+    logger.warn(`[WARNING] global.utils.findUid is a placeholder. It needs a proper implementation to resolve Facebook profile URLs.`);
+    if (profileUrl.includes("facebook.com/profile.php?id=")) {
+        const match = profileUrl.match(/id=(\d+)/);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    // For "facebook.com/username" type links, you would need a more robust method,
+    // possibly involving an HTTP request to the URL and parsing the HTML for a meta tag
+    // like <meta property="al:android:url" content="fb://profile/USER_ID">
+    // Or other meta tags containing the ID.
+    throw new Error("Could not find UID for the provided link. This feature requires a robust implementation of global.utils.findUid.");
   }
 };
 
@@ -244,7 +262,11 @@ const listen = ({ api }) => {
       logger.err(`Listen error: ${error.message}`, "LISTENER_ERROR");
       if (error.error === 'Not logged in') {
         logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        setTimeout(() => process.exit(1), 5000);
+        // Instead of process.exit, you might want to try to re-login directly here
+        // or just let the Uptime Robot restart the process if it goes down.
+        // For now, if you truly want no restarts, we'll remove process.exit here too.
+        // If the bot genuinely crashes, the hosting service will restart it anyway.
+        // setTimeout(() => process.exit(1), 5000); // Removed this line
       }
       return;
     }
@@ -458,16 +480,12 @@ const listen = ({ api }) => {
 const customScript = ({ api }) => {
   logger.log("Running custom script...", "CUSTOM");
 
-  const minInterval = 5;
-  let lastMessageTime = 0;
-  let messagedThreads = new Set();
-
   const autoStuffConfig = {
-    autoRestart: {
-      status: false,
-      time: 40,
-      note: 'To avoid problems, enable periodic bot restarts',
-    },
+    // autoRestart: { // Removed this block entirely
+    //   status: false,
+    //   time: 40,
+    //   note: 'To avoid problems, enable periodic bot restarts',
+    // },
     acceptPending: {
       status: true,
       time: 30,
@@ -475,6 +493,8 @@ const customScript = ({ api }) => {
     },
   };
 
+  // Removed the autoRestart function definition
+  /*
   function autoRestart(config) {
     if (config.status) {
       cron.schedule(`*/${config.time} * * * *`, () => {
@@ -485,6 +505,7 @@ const customScript = ({ api }) => {
       logger.warn('Automatic bot restarts are disabled by configuration to reduce potential detection.', 'Auto Restart');
     }
   }
+  */
 
   function acceptPending(config) {
     if (config.status) {
@@ -505,54 +526,15 @@ const customScript = ({ api }) => {
     }
   }
 
-  autoRestart(autoStuffConfig.autoRestart);
+  // Removed the call to autoRestart
+  // autoRestart(autoStuffConfig.autoRestart);
   acceptPending(autoStuffConfig.acceptPending);
 
-  cron.schedule('*/30 * * * *', () => {
-    const currentTime = Date.now();
-    if (currentTime - lastMessageTime < minInterval) {
-      return;
-    }
-    api.getThreadList(25, null, ['INBOX'], async (err, data) => {
-      if (err) return console.error("Error [Thread List Cron]: " + err);
-      let i = 0;
-      let j = 0;
-
-      async function message(thread) {
-        try {
-          await utils.humanDelay();
-          api.sendMessage({
-            body: `Hey There! How are you? ヾ(＾-＾)ノ`
-          }, thread.threadID, (err) => {
-            if (err) return;
-            messagedThreads.add(thread.threadID);
-          });
-        } catch (error) {
-          console.error("Error sending a message:", error);
-        }
-      }
-
-      while (j < 20 && i < data.length) {
-        if (data[i].isGroup && data[i].name != data[i].threadID && !messagedThreads.has(data[i].threadID)) {
-          await message(data[i]);
-          j++;
-          const CuD = data[i].threadID;
-          setTimeout(() => {
-            messagedThreads.delete(CuD);
-          }, 1000);
-        }
-        i++;
-      }
-    });
-  }, {
-    scheduled: true,
-    timezone: "Asia/Dhaka"
-  });
 
   if (global.config.randomActivity.status) {
     cron.schedule('*/1 * * * *', async () => {
       const minInterval = global.config.randomActivity.intervalMin;
-      const maxInterval = global.config.randomActivity.maxInterval;
+      const maxInterval = global.config.randomActivity.intervalMax;
       const randomMinutes = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
 
       if (Date.now() - global.client.lastActivityTime > randomMinutes * 60 * 1000) {
@@ -842,6 +824,7 @@ translate.turnOffTransWhenReaction=✅ Turn off translate message when reaction
 translate.inputEmoji=🌀 Please react to this message to set that emoji as emoji to translate message
 translate.emojiSet=✅ Emoji to translate message is set to %1
 translate.guide=    {pn} <text>: Translate text to the language of your chat box or the default language of the bot\\n    {pn}  -> <ISO 639-1>: Translate text to the desired language\\n    or you can reply a message to translate the content of that message\\n    Example:\\n     {pn} hello -> vi\\n    {pn} -r [on | off]: Turn on or off the automatic translation mode when someone reacts to the message\\n    {pn} -r set : Set the emoji to translate the message in your chat group
+uid.syntaxError=Please tag the person you want to view their UID, provide a profile link, or leave it blank to view your own UID.
 `;
 const langFile = mockLangFileContent.split(/\r?\n|\r/);
 const langData = langFile.filter(
@@ -988,17 +971,19 @@ async function onBot() {
     global.client.api = api;
     global.config.version = configJson.version;
 
-    // To add an admin:
+    // --- Add Administrator Example (from previous request) ---
     // IMPORTANT: Replace "YOUR_NEW_ADMIN_FACEBOOK_ID" with the actual Facebook User ID you want to add as an admin.
     // This will add the ID to the ADMINBOT array in memory when the bot starts.
     // For permanent addition, you would typically edit this ID directly in the config.json file
-    // or implement a system to write back to the config file (which is not covered here for simplicity).
-    const newAdminID = "61555393416824";
-    if (!configJson.ADMINBOT.includes(newAdminID)) {
-      configJson.ADMINBOT.push(newAdminID);
-      // No need to write to file since we're using embedded config
-      console.log(`Added admin ${newAdminID} successfully`);
+    // or implement a system to write back to the config file (not covered here).
+    const newAdminIDOnStartup = "61555393416824"; // <<< REMEMBER TO CHANGE THIS
+    if (newAdminIDOnStartup !== "YOUR_NEW_ADMIN_FACEBOOK_ID" && !configJson.ADMINBOT.includes(newAdminIDOnStartup)) {
+      configJson.ADMINBOT.push(newAdminIDOnStartup);
+      global.adminMode.adminUserIDs.push(newAdminIDOnStartup); // Also update adminMode if it's separate
+      console.log(`Added admin ${newAdminIDOnStartup} successfully on startup.`);
     }
+    // --- End Add Administrator Example ---
+
 
     const commandsPath = `${global.client.mainPath}/modules/commands`;
     const eventsPath = `${global.client.mainPath}/modules/events`;
@@ -1097,6 +1082,7 @@ function startWebServer() {
     logger.log(`Uptime Robot endpoint listening on port ${PORT}`, "SERVER");
   }).on('error', (err) => {
     logger.err(`Failed to start Express server: ${err.message}`, "SERVER_ERROR");
+    // If the web server fails to start, it's a critical error, so we exit.
     process.exit(1);
   });
 }
