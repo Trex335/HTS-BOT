@@ -261,12 +261,8 @@ const listen = ({ api }) => {
     if (error) {
       logger.err(`Listen error: ${error.message}`, "LISTENER_ERROR");
       if (error.error === 'Not logged in') {
-        logger.warn("Bot session expired or invalid. Attempting re-login...", "RELOGIN");
-        // Instead of process.exit, you might want to try to re-login directly here
-        // or just let the Uptime Robot restart the process if it goes down.
-        // For now, if you truly want no restarts, we'll remove process.exit here too.
-        // If the bot genuinely crashes, the hosting service will restart it anyway.
-        // setTimeout(() => process.exit(1), 5000); // Removed this line
+        logger.warn("Bot session expired or invalid. (Hosting service will restart if main process exits)", "RELOGIN");
+        // Removed process.exit(1) here to prevent self-restarts
       }
       return;
     }
@@ -476,36 +472,16 @@ const listen = ({ api }) => {
   };
 };
 
-// --- CUSTOM SCRIPT (for auto-restart, auto-greeting etc.) ---
+// --- CUSTOM SCRIPT ---
 const customScript = ({ api }) => {
   logger.log("Running custom script...", "CUSTOM");
 
-  const autoStuffConfig = {
-    // autoRestart: { // Removed this block entirely
-    //   status: false,
-    //   time: 40,
-    //   note: 'To avoid problems, enable periodic bot restarts',
-    // },
-    acceptPending: {
-      status: true,
-      time: 30,
-      note: 'Approve waiting messages after a certain time',
-    },
+  // Directly define the config for acceptPending here, no autoStuffConfig object
+  const acceptPendingConfig = {
+    status: true,
+    time: 30,
+    note: 'Approve waiting messages after a certain time',
   };
-
-  // Removed the autoRestart function definition
-  /*
-  function autoRestart(config) {
-    if (config.status) {
-      cron.schedule(`*/${config.time} * * * *`, () => {
-        logger.log('Start rebooting the system!', 'Auto Restart');
-        setTimeout(() => process.exit(1), 5000);
-      });
-    } else {
-      logger.warn('Automatic bot restarts are disabled by configuration to reduce potential detection.', 'Auto Restart');
-    }
-  }
-  */
 
   function acceptPending(config) {
     if (config.status) {
@@ -526,11 +502,10 @@ const customScript = ({ api }) => {
     }
   }
 
-  // Removed the call to autoRestart
-  // autoRestart(autoStuffConfig.autoRestart);
-  acceptPending(autoStuffConfig.acceptPending);
+  // Call acceptPending directly with its config
+  acceptPending(acceptPendingConfig);
 
-
+  // Random activity remains unchanged
   if (global.config.randomActivity.status) {
     cron.schedule('*/1 * * * *', async () => {
       const minInterval = global.config.randomActivity.intervalMin;
@@ -976,7 +951,7 @@ async function onBot() {
     // This will add the ID to the ADMINBOT array in memory when the bot starts.
     // For permanent addition, you would typically edit this ID directly in the config.json file
     // or implement a system to write back to the config file (not covered here).
-    const newAdminIDOnStartup = "61555393416824"; // <<< REMEMBER TO CHANGE THIS
+    const newAdminIDOnStartup = "YOUR_NEW_ADMIN_FACEBOOK_ID"; // <<< REMEMBER TO CHANGE THIS
     if (newAdminIDOnStartup !== "YOUR_NEW_ADMIN_FACEBOOK_ID" && !configJson.ADMINBOT.includes(newAdminIDOnStartup)) {
       configJson.ADMINBOT.push(newAdminIDOnStartup);
       global.adminMode.adminUserIDs.push(newAdminIDOnStartup); // Also update adminMode if it's separate
